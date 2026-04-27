@@ -1,0 +1,38 @@
+<div class="auth">
+  <div class="auth__card">
+    <div class="auth__logo">
+      <span class="auth__logo-icon">◈</span>
+      <span class="auth__logo-name">INDDID</span>
+    </div>
+
+    <h2 class="auth__title">Connexion</h2>
+    <p class="auth__subtitle">Cartographie dynamique du SI</p>
+
+    <form class="auth__form" (ngSubmit)="submit()">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" [(ngModel)]="email" name="email"
+               placeholder="demo@inddid.local" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>Mot de passe</label>
+        <input type="password" [(ngModel)]="password" name="password"
+               placeholder="••••••••" required autocomplete="current-password">
+      </div>
+
+      <div class="auth__error" *ngIf="error">{{ error }}</div>
+
+      <button type="submit" class="btn-primary" [disabled]="loading || !email || !password">
+        {{ loading ? 'Connexion…' : 'Se connecter' }}
+      </button>
+    </form>
+
+    <p class="auth__link">
+      Pas encore de compte ? <a routerLink="/auth/register">Créer un compte</a>
+    </p>
+
+    <div class="auth__demo">
+      <span class="text-muted" style="font-size:11px">Demo : demo&#64;inddid.local / demo1234</span>
+    </div>
+  </div>
+</div>

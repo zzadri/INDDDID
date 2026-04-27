@@ -1,0 +1,26 @@
+{
+	"permissions": {
+		"allow": [
+			"Read(*)",
+			"LS(*)",
+			"Grep(*)",
+			"Glob(*)",
+			"Edit(*)",
+			"Write(*)",
+			"MultiEdit(*)",
+			"Bash(npm run *)",
+			"Bash(npx ng *)",
+			"Bash(npx snyk *)",
+			"Bash(docker-compose build *)",
+			"Bash(docker-compose up *)",
+			"Bash(docker-compose down *)",
+			"Bash(docker-compose logs *)",
+			"Bash(docker-compose ps)"
+		],
+		"deny": [
+			"Bash(rm -rf *)",
+			"Bash(git reset --hard *)",
+			"Bash(git clean -fd *)"
+		]
+	}
+}

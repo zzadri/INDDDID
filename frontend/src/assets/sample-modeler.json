@@ -1,0 +1,112 @@
+{
+  "topology": {
+    "id": "topo-demo-002",
+    "name": "SI Agence – Réseau secondaire",
+    "description": "Architecture du SI de l'agence régionale – import modéleur démo",
+    "version": "1.0"
+  },
+  "nodes": [
+    {
+      "id": "agence-fw-01",
+      "label": "Firewall Agence",
+      "type": "firewall",
+      "ip": "185.12.34.56",
+      "zone": "EDGE",
+      "vendor": "Palo Alto",
+      "model": "PA-220",
+      "position": { "x": 300, "y": 60 }
+    },
+    {
+      "id": "agence-sw-01",
+      "label": "Switch Core Agence",
+      "type": "switch",
+      "ip": "10.10.0.1",
+      "zone": "CORE",
+      "vendor": "Cisco",
+      "model": "SG350",
+      "vlans": ["10", "20", "30"],
+      "position": { "x": 300, "y": 180 }
+    },
+    {
+      "id": "agence-srv-01",
+      "label": "Serveur Fichiers",
+      "type": "server",
+      "ip": "10.10.1.10",
+      "os": "Windows Server 2022",
+      "role": "fileserver",
+      "zone": "LAN",
+      "cpu": "4vCPU",
+      "ram": "16GB",
+      "position": { "x": 150, "y": 300 }
+    },
+    {
+      "id": "agence-srv-02",
+      "label": "Serveur Impression",
+      "type": "server",
+      "ip": "10.10.1.11",
+      "os": "Windows Server 2019",
+      "role": "print",
+      "zone": "LAN",
+      "position": { "x": 450, "y": 300 }
+    },
+    {
+      "id": "agence-db-01",
+      "label": "Base de données locale",
+      "type": "database",
+      "ip": "10.10.2.10",
+      "os": "Ubuntu 22.04",
+      "engine": "MySQL 8.0",
+      "zone": "DATA",
+      "position": { "x": 300, "y": 420 }
+    },
+    {
+      "id": "agence-app-erp",
+      "label": "ERP Agence",
+      "type": "application",
+      "version": "3.2.1",
+      "language": "Java",
+      "port": 8080,
+      "zone": "APP",
+      "position": { "x": 300, "y": 300 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "ag-e-001",
+      "source": "agence-fw-01",
+      "target": "agence-sw-01",
+      "type": "network",
+      "label": "LAN :1/1",
+      "port": 0
+    },
+    {
+      "id": "ag-e-002",
+      "source": "agence-sw-01",
+      "target": "agence-srv-01",
+      "type": "network",
+      "label": "VLAN 10"
+    },
+    {
+      "id": "ag-e-003",
+      "source": "agence-sw-01",
+      "target": "agence-srv-02",
+      "type": "network",
+      "label": "VLAN 10"
+    },
+    {
+      "id": "ag-e-004",
+      "source": "agence-sw-01",
+      "target": "agence-app-erp",
+      "type": "network",
+      "label": "VLAN 20"
+    },
+    {
+      "id": "ag-e-005",
+      "source": "agence-app-erp",
+      "target": "agence-db-01",
+      "type": "data_flow",
+      "label": "SQL :3306",
+      "port": 3306
+    }
+  ]
+}

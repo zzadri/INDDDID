@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: inddid-postgres
+    environment:
+      POSTGRES_DB:       ${DB_NAME:-inddid}
+      POSTGRES_USER:     ${DB_USER:-inddid}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-inddid_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - inddid-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-inddid} -d ${DB_NAME:-inddid}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: inddid-backend
+    user: "0:0"
+    environment:
+      NODE_ENV:    production
+      PORT:        3000
+      DB_HOST:     postgres
+      DB_PORT:     5432
+      DB_NAME:     ${DB_NAME:-inddid}
+      DB_USER:     ${DB_USER:-inddid}
+      DB_PASSWORD: ${DB_PASSWORD:-inddid_secret}
+      DATABASE_URL: postgresql://${DB_USER:-inddid}:${DB_PASSWORD:-inddid_secret}@postgres:5432/${DB_NAME:-inddid}?schema=public
+      JWT_SECRET:  ${JWT_SECRET:-inddid_jwt_super_secret_change_in_prod}
+      AES_SECRET:  ${AES_SECRET:-inddid_dev_aes_secret_change_in_prod}
+      CORS_ORIGIN: http://localhost:4200
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      DOCKER_DEPLOY_ENABLED: ${DOCKER_DEPLOY_ENABLED:-true}
+      DEPLOYMENTS_DIR: /tmp/inddid-deployments
+      # Proxmox endpoints use self-signed TLS by default — skip cert check
+      # for preflight HTTP calls (terraform bpg provider uses insecure=true).
+      NODE_TLS_REJECT_UNAUTHORIZED: '0'
+      # Proxmox config : entièrement gérée par projet via l'UI (stockée
+      # chiffrée en DB). Aucune variable d'env n'est lue côté backend.
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - backend_deployments:/tmp/inddid-deployments
+    networks:
+      - inddid-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: inddid-frontend
+    ports:
+      - "4200:80"
+    networks:
+      - inddid-net
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  backend_deployments:
+
+networks:
+  inddid-net:
+    driver: bridge

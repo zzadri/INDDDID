@@ -1,0 +1,728 @@
+<div class="modeler" *ngIf="!loading; else loadingTpl">
+
+  <!-- ── Header ── -->
+  <header class="modeler__header">
+    <button class="btn-ghost btn-icon" routerLink="/dashboard" title="Retour aux projets (← Dashboard)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+
+    <div class="modeler__brand">
+      <span class="modeler__brand-icon">◈</span>
+      <span class="modeler__brand-name">INDDID</span>
+    </div>
+
+    <div class="modeler__project-name truncate">{{ project.name }}</div>
+
+    <div class="modeler__toolbar">
+      <button class="modeler__toolbar-btn" [class.modeler__toolbar-btn--active]="mode === 'select'"
+              (click)="mode = 'select'" title="Mode sélection [S]">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
+        </svg>
+        Sélection
+      </button>
+      <button class="modeler__toolbar-btn" [class.modeler__toolbar-btn--active]="mode === 'connect'"
+              (click)="mode = 'connect'" title="Mode connexion [C]">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+        Connecter
+      </button>
+      <span class="modeler__toolbar-sep"></span>
+      <button class="modeler__toolbar-btn" (click)="fitView()"     title="Ajuster vue [F]">⊞</button>
+      <button class="modeler__toolbar-btn" (click)="resetLayout()" title="Recalculer layout [L]">⌗</button>
+    </div>
+
+    <div class="modeler__stats">
+      <span>{{ graph.nodes.length }} nœuds</span>
+      <span>{{ graph.edges.length }} liens</span>
+    </div>
+
+    <div class="modeler__actions">
+      <button class="modeler__actions-btn" (click)="openDeployModal()" title="Déployer sur Docker Desktop">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+        Deploy
+      </button>
+      <button class="btn-ghost btn-icon" (click)="showHelp = true" title="Aide clavier [Ctrl+/]">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </button>
+      <button class="btn-ghost btn-icon" (click)="theme.toggle()" title="Thème">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <ng-container *ngIf="theme.isDark">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          </ng-container>
+          <ng-container *ngIf="!theme.isDark">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </ng-container>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="modeler__body">
+
+    <!-- ── Left palette — components only ── -->
+    <aside class="palette">
+      <div class="palette__title">Composants deployables (MVP)</div>
+
+      <div class="palette__item"
+           *ngFor="let icon of nodeIcons"
+           draggable="true"
+           (dragstart)="onPaletteDragStart($event, icon.type)"
+           (dblclick)="addNode(icon.type)"
+           [title]="icon.label + ' — glisser ou double-clic'">
+        <span class="palette__icon" [innerHTML]="safeIcon(icon.type, 18)"></span>
+        <span class="palette__label">{{ icon.label }}</span>
+      </div>
+    </aside>
+
+    <!-- ── Canvas ── -->
+    <main class="canvas"
+          (dragover)="onCanvasDragOver($event)"
+          (drop)="onCanvasDrop($event)">
+      <div class="canvas__cy" #cyContainer></div>
+
+      <div class="canvas__hint" *ngIf="mode === 'connect' && !connectSource">
+        Cliquez ou <kbd>Tab</kbd>+<kbd>Entrée</kbd> → nœud <strong>source</strong>
+      </div>
+      <div class="canvas__hint canvas__hint--active" *ngIf="mode === 'connect' && connectSource">
+        Cliquez ou <kbd>Tab</kbd>+<kbd>Entrée</kbd> → nœud <strong>cible</strong> &nbsp;·&nbsp; <kbd>Échap</kbd> annuler
+      </div>
+    </main>
+
+    <!-- ── Right panel ── -->
+    <aside class="side-panel">
+      <div class="side-panel__tabs">
+        <button class="side-panel__tab" [class.side-panel__tab--active]="rightPanel === 'properties'"
+                (click)="rightPanel = 'properties'">Propriétés</button>
+        <button class="side-panel__tab" [class.side-panel__tab--active]="rightPanel === 'templates'"
+                (click)="rightPanel = 'templates'">Templates</button>
+      </div>
+
+      <!-- ── Properties panel ── -->
+      <div class="side-panel__content" *ngIf="rightPanel === 'properties'">
+
+        <!-- Node selected -->
+        <ng-container *ngIf="selectedNode">
+          <div class="prop-panel__header">
+            <span class="prop-panel__header-icon" [innerHTML]="safeIcon(selectedNode.type, 18)"></span>
+            <span class="badge" [class]="'badge--' + selectedNode.type">{{ selectedNode.type }}</span>
+          </div>
+
+          <div class="form-group">
+            <label>Nom</label>
+            <input type="text" [(ngModel)]="nodeLabel" (keyup.enter)="saveNode()" placeholder="Nom du nœud">
+          </div>
+
+          <div class="prop-panel__section-title">Propriétés</div>
+          <div class="form-group" *ngFor="let field of propFields">
+            <label>{{ field.label }}</label>
+            <ng-container [ngSwitch]="field.type">
+              <select *ngSwitchCase="'select'" [(ngModel)]="nodeForm[field.key]">
+                <option value="">— choisir —</option>
+                <option *ngFor="let o of field.options" [value]="o">{{ o }}</option>
+              </select>
+              <input *ngSwitchCase="'text'"     type="text"   [(ngModel)]="nodeForm[field.key]" [placeholder]="field.placeholder ?? ''">
+              <input *ngSwitchCase="'number'"   type="number" [(ngModel)]="nodeForm[field.key]" [placeholder]="field.placeholder ?? ''">
+              <textarea *ngSwitchCase="'textarea'" [(ngModel)]="nodeForm[field.key]" rows="3" [placeholder]="field.placeholder ?? ''"></textarea>
+              <label class="prop-panel__bool-field" *ngSwitchCase="'boolean'">
+                <input type="checkbox" [(ngModel)]="nodeForm[field.key]">
+                <span>Activé</span>
+              </label>
+            </ng-container>
+          </div>
+
+          <div class="prop-panel__section-title">Propriétés personnalisées</div>
+          <div class="prop-panel__custom-prop" *ngFor="let entry of customProps()">
+            <span class="prop-panel__custom-key">{{ entry[0] }}</span>
+            <span class="prop-panel__custom-val truncate">{{ entry[1] }}</span>
+            <button class="btn-ghost btn-icon" (click)="removeProp(entry[0])">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <div class="prop-panel__custom-add">
+            <input type="text" [(ngModel)]="customKey"   placeholder="clé"    style="flex:1">
+            <input type="text" [(ngModel)]="customValue" placeholder="valeur" style="flex:2" (keyup.enter)="addCustomProp()">
+            <button (click)="addCustomProp()">+</button>
+          </div>
+
+          <div class="prop-panel__actions">
+            <button class="btn-primary" [disabled]="saving" (click)="saveNode()">
+              {{ saving ? '…' : 'Sauvegarder' }}
+            </button>
+            <button class="btn-danger" (click)="deleteNode()">Supprimer</button>
+          </div>
+
+          <div class="prop-panel__tpl-save">
+            <div class="prop-panel__section-title">Sauvegarder comme template</div>
+            <div class="prop-panel__tpl-save-row">
+              <input type="text" [(ngModel)]="newTplName" placeholder="Nom du template" (keyup.enter)="saveAsTemplate()">
+              <button [disabled]="!newTplName.trim() || savingTpl" (click)="saveAsTemplate()">
+                {{ savingTpl ? '…' : 'Sauver' }}
+              </button>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- Edge selected -->
+        <ng-container *ngIf="selectedEdge && !selectedNode">
+          <div class="prop-panel__header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+            </svg>
+            <span class="text-muted" style="font-size:12px">Lien sélectionné</span>
+          </div>
+
+          <div class="prop-panel__edge-info">
+            <span class="text-muted">Source</span>
+            <code>{{ getNodeLabel(selectedEdge.source_node_id) }}</code>
+            <span class="text-muted">Cible</span>
+            <code>{{ getNodeLabel(selectedEdge.target_node_id) }}</code>
+          </div>
+
+          <div class="form-group">
+            <label>Titre du lien</label>
+            <input type="text" [(ngModel)]="edgeLabel" placeholder="ex: HTTP :8080, SQL :5432…" (keyup.enter)="saveEdge()">
+          </div>
+
+          <div class="form-group">
+            <label>Type</label>
+            <select [(ngModel)]="edgeType">
+              <option *ngFor="let t of edgeTypes" [value]="t">{{ edgeTypeLabels[t] }}</option>
+            </select>
+          </div>
+
+          <div class="prop-panel__actions">
+            <button class="btn-primary" [disabled]="savingEdge" (click)="saveEdge()">
+              {{ savingEdge ? '…' : 'Sauvegarder' }}
+            </button>
+            <button class="btn-danger" (click)="deleteEdge()">Supprimer</button>
+          </div>
+        </ng-container>
+
+        <!-- Nothing selected -->
+        <div class="prop-panel__empty" *ngIf="!selectedNode && !selectedEdge">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+            <path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
+          </svg>
+          <p class="text-faint">Sélectionnez un nœud ou un lien<br>ou glissez un composant sur le canvas</p>
+          <p class="text-faint" style="font-size:10px; margin-top:4px">
+            <kbd>A</kbd> ajouter &nbsp;·&nbsp; <kbd>Tab</kbd> cycler &nbsp;·&nbsp; <kbd>Ctrl+/</kbd> aide
+          </p>
+        </div>
+      </div>
+
+      <!-- ── Templates panel ── -->
+      <div class="side-panel__content" *ngIf="rightPanel === 'templates'">
+        <p class="text-muted" style="font-size:12px; padding: 4px 0 8px">
+          Glissez sur le canvas ou double-cliquez pour ajouter.
+        </p>
+
+        <div class="tpl-panel__list" *ngIf="templates.length > 0; else noTemplates">
+          <div class="tpl-panel__card"
+               *ngFor="let tpl of templates"
+               draggable="true"
+               (dragstart)="onTemplateDragStart($event, tpl)"
+               (dblclick)="addNodeFromTemplate(tpl, 200, 200)">
+            <span class="tpl-panel__card-icon" [innerHTML]="safeIcon(tpl.type, 16)"></span>
+            <div class="tpl-panel__card-info">
+              <span class="tpl-panel__card-name">{{ tpl.name }}</span>
+              <span class="badge badge--sm" [class]="'badge--' + tpl.type">{{ tpl.type }}</span>
+            </div>
+            <span class="tpl-panel__card-global" *ngIf="tpl.is_global" title="Template global">★</span>
+            <button class="btn-ghost btn-icon" (click)="deleteTemplate(tpl.id)" *ngIf="!tpl.is_global" title="Supprimer">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <ng-template #noTemplates>
+          <p class="text-faint" style="font-size:11px; text-align:center; padding:16px 0">
+            Aucun template.<br>Sélectionnez un nœud et sauvegardez-le comme template.
+          </p>
+        </ng-template>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ── Loading ── -->
+<ng-template #loadingTpl>
+  <div class="modeler__loading">
+    <div class="spinner"></div>
+    <span class="text-muted">Chargement du projet…</span>
+  </div>
+</ng-template>
+
+<!-- ── Deploy modal ── -->
+<div class="modal-overlay" *ngIf="showDeployModal" (click)="showDeployModal = false">
+  <div class="deploy-modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+
+    <!-- Header + tabs -->
+    <div class="deploy-modal__header">
+      <div class="deploy-modal__tabs">
+        <button class="deploy-modal__tab"
+                [class.deploy-modal__tab--active]="deployTab === 'docker'"
+                (click)="switchDeployTab('docker')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          </svg>
+          Docker Desktop
+        </button>
+        <button class="deploy-modal__tab"
+                [class.deploy-modal__tab--active]="deployTab === 'proxmox'"
+                (click)="switchDeployTab('proxmox')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/>
+            <path d="M15 2v2"/><path d="M9 2v2"/><path d="M15 20v2"/><path d="M9 20v2"/>
+            <path d="M2 9h2"/><path d="M2 15h2"/><path d="M20 9h2"/><path d="M20 15h2"/>
+          </svg>
+          Proxmox / Terraform
+        </button>
+      </div>
+      <button class="btn-ghost btn-icon" (click)="showDeployModal = false" style="flex-shrink:0">✕</button>
+    </div>
+
+    <!-- ── Docker Desktop pane ── -->
+    <ng-container *ngIf="deployTab === 'docker'">
+      <p class="deploy-modal__subtitle" *ngIf="deployProjectKey" style="margin: 8px 16px 0; font-size:11px; color:var(--text-faint); font-family:var(--font-mono)">
+        Projet compose : {{ deployProjectKey }}
+      </p>
+
+      <div class="deploy-modal__notice" *ngIf="!deployEnabled">
+        Mode exécution Docker désactivé. Active <code>DOCKER_DEPLOY_ENABLED=true</code> pour Up/Down.
+      </div>
+
+      <div class="deploy-modal__body">
+        <div class="deploy-modal__pane">
+          <div class="deploy-modal__pane-title">docker-compose généré</div>
+          <ng-container *ngIf="!deployLoading; else dockerLoadingTpl">
+            <pre class="deploy-modal__code">{{ deployCompose }}</pre>
+          </ng-container>
+        </div>
+
+        <div class="deploy-modal__pane deploy-modal__pane--side">
+          <div class="deploy-modal__pane-title">Conteneurs actifs</div>
+          <div class="deploy-modal__status" *ngIf="deployContainers.length > 0; else deployEmptyTpl">
+            <div class="deploy-modal__status-row" *ngFor="let c of deployContainers">
+              <span class="deploy-modal__status-name">{{ c.name }}</span>
+              <span class="deploy-modal__status-image text-faint">{{ c.image }}</span>
+              <span class="deploy-modal__status-state">{{ c.status }}</span>
+            </div>
+          </div>
+          <ng-template #deployEmptyTpl>
+            <p class="text-faint" style="font-size:11px">Aucun conteneur INDDID actif.</p>
+          </ng-template>
+          <div class="deploy-modal__output" *ngIf="deployOutput">
+            <div class="deploy-modal__pane-title">Sortie commande</div>
+            <pre class="deploy-modal__code deploy-modal__code--small">{{ deployOutput }}</pre>
+          </div>
+        </div>
+      </div>
+
+      <p class="deploy-modal__error" *ngIf="deployError">{{ deployError }}</p>
+
+      <div class="deploy-modal__footer">
+        <button (click)="refreshDeployPreview()" [disabled]="deployLoading || deployRunning">
+          {{ deployLoading ? 'Actualisation…' : 'Régénérer compose' }}
+        </button>
+        <button (click)="refreshDeployStatus()" [disabled]="deployLoading || deployRunning">Statut</button>
+        <button class="btn-primary" (click)="deployUp()" [disabled]="deployLoading || deployRunning || !deployEnabled">
+          {{ deployRunning ? 'Déploiement…' : 'Up (docker compose)' }}
+        </button>
+        <button class="btn-danger" (click)="deployDown()" [disabled]="deployLoading || deployRunning || !deployEnabled">Down (rm)</button>
+      </div>
+    </ng-container>
+
+    <!-- ── Proxmox / Terraform pane ── -->
+    <ng-container *ngIf="deployTab === 'proxmox'">
+
+      <!-- ── No config yet : inline setup form ── -->
+      <ng-container *ngIf="!proxmoxConfig && !proxmoxConfigLoading">
+        <div class="deploy-modal__config-banner deploy-modal__config-banner--missing">
+          <span class="deploy-modal__config-status">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Aucune config Proxmox pour ce projet — renseigne les champs ci-dessous.
+          </span>
+        </div>
+
+        <div class="deploy-modal__body">
+          <div class="deploy-modal__pane proxmox-cfg-inline">
+
+            <details class="proxmox-cfg-modal__help">
+              <summary>Comment préparer Proxmox ? (setup une fois)</summary>
+              <ol class="proxmox-cfg-modal__help-list">
+                <li>
+                  <strong>Créer un utilisateur + rôle dédiés</strong>
+                  <pre class="proxmox-cfg-modal__code">pveum role add TerraformProv -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.PowerMgmt VM.Audit Datastore.AllocateSpace Datastore.Audit Pool.Allocate Sys.Audit SDN.Use"
+pveum user add terraform-prov&#64;pve --password 'STRONG_PASS'
+pveum aclmod / -user terraform-prov&#64;pve -role TerraformProv</pre>
+                </li>
+                <li>
+                  <strong>Créer un token API (recommandé)</strong>
+                  <pre class="proxmox-cfg-modal__code">pveum user token add terraform-prov&#64;pve terraform -privsep 0
+# Format à coller : terraform-prov&#64;pve!terraform=&lt;secret-uuid&gt;</pre>
+                </li>
+                <li>
+                  <strong>Template VM cloud-init (ID 9000)</strong>
+                  <pre class="proxmox-cfg-modal__code">cd /var/lib/vz/template/iso
+wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+virt-customize -a jammy-server-cloudimg-amd64.img --install qemu-guest-agent
+qm create 9000 --name ubuntu-2204-cloud --memory 2048 --cores 2 --net0 virtio,bridge=vmbr0
+qm importdisk 9000 jammy-server-cloudimg-amd64.img local-lvm
+qm set 9000 --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-9000-disk-0
+qm set 9000 --ide2 local-lvm:cloudinit --boot c --bootdisk scsi0
+qm set 9000 --serial0 socket --vga serial0 --agent enabled=1
+qm template 9000</pre>
+                </li>
+                <li>
+                  <strong>Template LXC</strong>
+                  <pre class="proxmox-cfg-modal__code">pveam update
+pveam download local ubuntu-22.04-standard_22.04-1_amd64.tar.zst</pre>
+                </li>
+              </ol>
+            </details>
+
+            <div class="form-group">
+              <label>Endpoint Proxmox</label>
+              <input type="url" [(ngModel)]="proxmoxConfigForm.endpoint" placeholder="https://192.168.1.92:8006/">
+            </div>
+
+            <div class="form-group">
+              <label>Utilisateur</label>
+              <input type="text" [(ngModel)]="proxmoxConfigForm.username" placeholder="terraform-prov@pve">
+              <small class="text-faint">Format <code>user&#64;pam</code> ou <code>user&#64;pve</code>.</small>
+            </div>
+
+            <div class="form-group">
+              <label>Mode d'authentification</label>
+              <div class="proxmox-cfg-modal__radio-row">
+                <label><input type="radio" value="token"    [(ngModel)]="proxmoxConfigForm.credential_mode"> Token API</label>
+                <label><input type="radio" value="password" [(ngModel)]="proxmoxConfigForm.credential_mode"> Mot de passe</label>
+              </div>
+            </div>
+
+            <div class="form-group" *ngIf="proxmoxConfigForm.credential_mode === 'token'">
+              <label>Token API</label>
+              <input type="password" [(ngModel)]="proxmoxConfigForm.api_token"
+                     placeholder="terraform-prov@pve!terraform=uuid...">
+            </div>
+
+            <div class="form-group" *ngIf="proxmoxConfigForm.credential_mode === 'password'">
+              <label>Mot de passe</label>
+              <input type="password" [(ngModel)]="proxmoxConfigForm.password" placeholder="Mot de passe Proxmox">
+            </div>
+
+            <div class="proxmox-cfg-modal__grid">
+              <div class="form-group">
+                <label>Node PVE</label>
+                <input type="text" [(ngModel)]="proxmoxConfigForm.node" placeholder="pve">
+              </div>
+              <div class="form-group">
+                <label>Template VM ID</label>
+                <input type="number" [(ngModel)]="proxmoxConfigForm.template_vm_id" placeholder="9000">
+              </div>
+              <div class="form-group">
+                <label>Storage</label>
+                <input type="text" [(ngModel)]="proxmoxConfigForm.storage" placeholder="local-lvm">
+              </div>
+              <div class="form-group">
+                <label>Gateway</label>
+                <input type="text" [(ngModel)]="proxmoxConfigForm.gateway" placeholder="192.168.1.1">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Template LXC</label>
+              <input type="text" [(ngModel)]="proxmoxConfigForm.lxc_template"
+                     placeholder="local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst">
+            </div>
+
+            <p class="deploy-modal__error" *ngIf="proxmoxConfigError">{{ proxmoxConfigError }}</p>
+          </div>
+        </div>
+
+        <div class="deploy-modal__footer">
+          <button class="btn-primary" [disabled]="proxmoxConfigSaving" (click)="saveProxmoxConfig()">
+            {{ proxmoxConfigSaving ? 'Enregistrement…' : 'Enregistrer la config Proxmox' }}
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- ── Config present : HCL + actions ── -->
+      <ng-container *ngIf="proxmoxConfig">
+        <div class="deploy-modal__config-banner">
+          <span class="deploy-modal__config-status">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Config : <strong>{{ proxmoxConfig.endpoint }}</strong>
+            · node <code>{{ proxmoxConfig.node }}</code>
+            · user <code>{{ proxmoxConfig.username }}</code>
+            · <em>{{ proxmoxConfig.has_api_token ? 'token API' : 'mot de passe' }}</em>
+          </span>
+          <button class="btn-ghost btn-sm" (click)="openProxmoxConfigModal()">Modifier</button>
+        </div>
+
+        <div class="deploy-modal__body" *ngIf="!tfLoading; else tfLoadingTpl">
+          <div class="deploy-modal__pane">
+            <div class="deploy-modal__pane-title">
+              HCL généré — {{ tfDeployableCount }} ressource(s) Proxmox
+              <span *ngIf="tfSkippedTypes.length" class="text-faint" style="font-weight:400; margin-left:6px">
+                (ignorés : {{ tfSkippedTypes.join(', ') }})
+              </span>
+            </div>
+            <pre class="deploy-modal__code">{{ tfHcl }}</pre>
+          </div>
+
+          <div class="deploy-modal__pane deploy-modal__pane--side" *ngIf="tfOutput">
+            <div class="deploy-modal__pane-title">Sortie Terraform</div>
+            <pre class="deploy-modal__code">{{ tfOutput }}</pre>
+          </div>
+        </div>
+
+        <p class="deploy-modal__error" *ngIf="tfError">{{ tfError }}</p>
+
+        <div class="deploy-modal__footer">
+          <button (click)="loadTerraformPreview()" [disabled]="tfLoading || tfRunning">
+            {{ tfLoading ? 'Génération…' : 'Régénérer HCL' }}
+          </button>
+          <button (click)="terraformPlan()" [disabled]="tfLoading || tfRunning">
+            {{ tfRunning ? 'En cours…' : 'Plan' }}
+          </button>
+          <button class="btn-primary" (click)="terraformApply()" [disabled]="tfLoading || tfRunning">Apply</button>
+          <button class="btn-danger"  (click)="terraformDestroy()" [disabled]="tfLoading || tfRunning">Destroy</button>
+        </div>
+      </ng-container>
+
+      <!-- Loading state -->
+      <div class="deploy-modal__loading" *ngIf="proxmoxConfigLoading">
+        <div class="spinner"></div>
+        <span class="text-muted">Chargement de la config…</span>
+      </div>
+    </ng-container>
+
+  </div>
+</div>
+
+<ng-template #dockerLoadingTpl>
+  <div class="deploy-modal__loading">
+    <div class="spinner"></div>
+    <span class="text-muted">Génération du docker-compose…</span>
+  </div>
+</ng-template>
+
+<ng-template #tfLoadingTpl>
+  <div class="deploy-modal__loading">
+    <div class="spinner"></div>
+    <span class="text-muted">Génération du HCL Terraform…</span>
+  </div>
+</ng-template>
+
+<!-- ── Quick-add modal ── -->
+<div class="modal-overlay" *ngIf="showQuickAdd" (click)="showQuickAdd = false">
+  <div class="quick-add" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+    <div class="quick-add__header">
+      <span class="quick-add__title">Ajouter un composant</span>
+      <div class="quick-add__hint">
+        <kbd>↑↓</kbd> naviguer &nbsp;·&nbsp; <kbd>Entrée</kbd> ajouter &nbsp;·&nbsp; <kbd>Échap</kbd> fermer
+      </div>
+    </div>
+    <div class="quick-add__list">
+      <button class="quick-add__item"
+              *ngFor="let icon of nodeIcons; let i = index"
+              [class.quick-add__item--active]="i === quickAddIdx"
+              (click)="addNodeAtCenter(icon.type)"
+              (mouseenter)="quickAddIdx = i">
+        <span class="quick-add__item-icon" [innerHTML]="safeIcon(icon.type, 20)"></span>
+        <span class="quick-add__item-label">{{ icon.label }}</span>
+        <span class="quick-add__item-type text-faint">{{ icon.type }}</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Delete confirm modal ── -->
+<div class="modal-overlay" *ngIf="showDeleteConfirm" (click)="cancelDelete()">
+  <div class="confirm-modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+    <div class="confirm-modal__icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
+    </div>
+    <h3 class="confirm-modal__title">Supprimer ?</h3>
+    <p class="confirm-modal__label">{{ deleteConfirmLabel }}</p>
+    <p class="confirm-modal__warning">Cette action est irréversible.</p>
+    <div class="confirm-modal__actions">
+      <button class="btn-danger" (click)="confirmDelete()">Supprimer</button>
+      <button (click)="cancelDelete()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Proxmox config modal ── -->
+<div class="modal-overlay" *ngIf="showProxmoxConfigModal" (click)="showProxmoxConfigModal = false">
+  <div class="proxmox-cfg-modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+    <div class="proxmox-cfg-modal__header">
+      <h3 class="proxmox-cfg-modal__title">Configuration Proxmox du projet</h3>
+      <button class="btn-ghost btn-icon" (click)="showProxmoxConfigModal = false">✕</button>
+    </div>
+
+    <div class="proxmox-cfg-modal__body" *ngIf="!proxmoxConfigLoading; else cfgLoadingTpl">
+
+      <details class="proxmox-cfg-modal__help">
+        <summary>Comment préparer Proxmox ? (setup une fois)</summary>
+        <ol class="proxmox-cfg-modal__help-list">
+          <li>
+            <strong>Créer un utilisateur dédié + rôle (moindre privilège)</strong>
+            <pre class="proxmox-cfg-modal__code">pveum role add TerraformProv -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.PowerMgmt VM.Audit Datastore.AllocateSpace Datastore.Audit Pool.Allocate Sys.Audit SDN.Use"
+pveum user add terraform-prov&#64;pve --password 'STRONG_PASS'
+pveum aclmod / -user terraform-prov&#64;pve -role TerraformProv</pre>
+          </li>
+          <li>
+            <strong>Créer un token API (recommandé)</strong>
+            <pre class="proxmox-cfg-modal__code">pveum user token add terraform-prov&#64;pve terraform -privsep 0
+# → copier le secret UUID. Format à coller dans "Token API" ci-dessous :
+#   terraform-prov&#64;pve!terraform=&lt;secret-uuid&gt;</pre>
+          </li>
+          <li>
+            <strong>Préparer un template VM cloud-init (ID 9000)</strong>
+            <pre class="proxmox-cfg-modal__code">cd /var/lib/vz/template/iso
+wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+virt-customize -a jammy-server-cloudimg-amd64.img --install qemu-guest-agent
+qm create 9000 --name ubuntu-2204-cloud --memory 2048 --cores 2 --net0 virtio,bridge=vmbr0
+qm importdisk 9000 jammy-server-cloudimg-amd64.img local-lvm
+qm set 9000 --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-9000-disk-0
+qm set 9000 --ide2 local-lvm:cloudinit --boot c --bootdisk scsi0
+qm set 9000 --serial0 socket --vga serial0 --agent enabled=1
+qm template 9000</pre>
+          </li>
+          <li>
+            <strong>Télécharger template LXC Ubuntu 22.04</strong>
+            <pre class="proxmox-cfg-modal__code">pveam update
+pveam download local ubuntu-22.04-standard_22.04-1_amd64.tar.zst</pre>
+          </li>
+        </ol>
+      </details>
+
+      <div class="form-group">
+        <label>Endpoint Proxmox</label>
+        <input type="url" [(ngModel)]="proxmoxConfigForm.endpoint" placeholder="https://192.168.1.92:8006/">
+      </div>
+
+      <div class="form-group">
+        <label>Utilisateur</label>
+        <input type="text" [(ngModel)]="proxmoxConfigForm.username" placeholder="terraform-prov@pve">
+        <small class="text-faint">Format <code>user&#64;pam</code> ou <code>user&#64;pve</code>. Si realm omis, <code>&#64;pam</code> est ajouté.</small>
+      </div>
+
+      <div class="form-group">
+        <label>Mode d'authentification</label>
+        <div class="proxmox-cfg-modal__radio-row">
+          <label><input type="radio" value="token"    [(ngModel)]="proxmoxConfigForm.credential_mode"> Token API</label>
+          <label><input type="radio" value="password" [(ngModel)]="proxmoxConfigForm.credential_mode"> Mot de passe</label>
+        </div>
+      </div>
+
+      <div class="form-group" *ngIf="proxmoxConfigForm.credential_mode === 'token'">
+        <label>Token API <span class="text-faint">(format user&#64;realm!id=secret)</span></label>
+        <input type="password" [(ngModel)]="proxmoxConfigForm.api_token"
+               [placeholder]="proxmoxConfig?.has_api_token ? '•••••••• (laisser vide = conserver)' : 'terraform-prov@pve!terraform=uuid...'">
+      </div>
+
+      <div class="form-group" *ngIf="proxmoxConfigForm.credential_mode === 'password'">
+        <label>Mot de passe</label>
+        <input type="password" [(ngModel)]="proxmoxConfigForm.password"
+               [placeholder]="proxmoxConfig?.has_password ? '•••••••• (laisser vide = conserver)' : 'Mot de passe Proxmox'">
+      </div>
+
+      <div class="proxmox-cfg-modal__grid">
+        <div class="form-group">
+          <label>Node PVE</label>
+          <input type="text" [(ngModel)]="proxmoxConfigForm.node" placeholder="pve">
+        </div>
+        <div class="form-group">
+          <label>Template VM ID</label>
+          <input type="number" [(ngModel)]="proxmoxConfigForm.template_vm_id" placeholder="9000">
+        </div>
+        <div class="form-group">
+          <label>Storage</label>
+          <input type="text" [(ngModel)]="proxmoxConfigForm.storage" placeholder="local-lvm">
+        </div>
+        <div class="form-group">
+          <label>Gateway</label>
+          <input type="text" [(ngModel)]="proxmoxConfigForm.gateway" placeholder="192.168.1.1">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Template LXC</label>
+        <input type="text" [(ngModel)]="proxmoxConfigForm.lxc_template"
+               placeholder="local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst">
+      </div>
+
+      <p class="deploy-modal__error" *ngIf="proxmoxConfigError">{{ proxmoxConfigError }}</p>
+    </div>
+
+    <div class="proxmox-cfg-modal__footer">
+      <button class="btn-danger btn-sm" *ngIf="proxmoxConfig" (click)="deleteProxmoxConfig()">Supprimer</button>
+      <span style="flex:1"></span>
+      <button (click)="showProxmoxConfigModal = false">Annuler</button>
+      <button class="btn-primary" [disabled]="proxmoxConfigSaving" (click)="saveProxmoxConfig()">
+        {{ proxmoxConfigSaving ? 'Enregistrement…' : 'Enregistrer' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<ng-template #cfgLoadingTpl>
+  <div class="proxmox-cfg-modal__loading">
+    <div class="spinner"></div>
+    <span class="text-muted">Chargement…</span>
+  </div>
+</ng-template>
+
+<!-- ── Keyboard help modal ── -->
+<div class="modal-overlay" *ngIf="showHelp" (click)="showHelp = false">
+  <div class="help-modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+    <div class="help-modal__header">
+      <div class="help-modal__title-row">
+        <h3 class="help-modal__title">Raccourcis clavier</h3>
+        <div class="help-modal__shortcut-badge">
+          <kbd>Ctrl</kbd><kbd>/</kbd>
+        </div>
+      </div>
+      <button class="btn-ghost btn-icon" (click)="showHelp = false">✕</button>
+    </div>
+    <div class="help-modal__body">
+      <div class="help-modal__group" *ngFor="let group of shortcuts">
+        <h4 class="help-modal__group-title">{{ group.group }}</h4>
+        <div class="help-modal__grid">
+          <div class="help-modal__item" *ngFor="let item of group.items">
+            <span class="help-modal__item-label">{{ item.label }}</span>
+            <div class="help-modal__item-keys">
+              <kbd *ngFor="let k of item.keys">{{ k }}</kbd>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

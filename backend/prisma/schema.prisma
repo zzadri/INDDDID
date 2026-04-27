@@ -1,0 +1,142 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String              @id @default(uuid()) @db.Uuid
+  email               String              @unique @db.VarChar(255)
+  password_hash       String              @db.VarChar(255)
+  display_name        String?             @db.VarChar(100)
+  created_at          DateTime            @default(now()) @db.Timestamp(6)
+  projects            Project[]           @relation("ProjectOwner")
+  project_permissions ProjectPermission[]
+  node_templates      NodeTemplate[]
+
+  @@map("users")
+}
+
+model Project {
+  id                  String              @id @default(uuid()) @db.Uuid
+  name                String              @db.VarChar(200)
+  description         String?
+  version             String              @default("1.0") @db.VarChar(20)
+  color               String              @default("#58a6ff") @db.VarChar(20)
+  tags                String              @default("")
+  owner_id            String              @db.Uuid
+  created_at          DateTime            @default(now()) @db.Timestamp(6)
+  updated_at          DateTime            @updatedAt @db.Timestamp(6)
+  owner               User                @relation("ProjectOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+  project_permissions ProjectPermission[]
+  nodes               Node[]
+  edges               Edge[]
+  proxmox_config      ProjectProxmoxConfig?
+  proxmox_images      ProjectProxmoxImage[]
+
+  @@index([owner_id], map: "idx_projects_owner")
+  @@map("projects")
+}
+
+model ProjectProxmoxImage {
+  id             String   @id @default(uuid()) @db.Uuid
+  project_id     String   @db.Uuid
+  os_label       String   @db.VarChar(100)
+  filename       String   @db.VarChar(200)
+  source_url     String   @db.VarChar(800)
+  template_vm_id Int
+  storage        String   @default("local")      @db.VarChar(100)
+  created_at     DateTime @default(now())        @db.Timestamp(6)
+  updated_at     DateTime @updatedAt             @db.Timestamp(6)
+  project        Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, os_label])
+  @@unique([project_id, template_vm_id])
+  @@index([project_id], map: "idx_proxmox_images_project")
+  @@map("project_proxmox_images")
+}
+
+model ProjectProxmoxConfig {
+  project_id      String   @id @db.Uuid
+  endpoint        String   @db.VarChar(500)
+  username        String   @db.VarChar(200)
+  api_token_enc   String?
+  password_enc    String?
+  node            String   @default("pve")         @db.VarChar(100)
+  template_vm_id  Int      @default(9000)
+  storage         String   @default("local-lvm")   @db.VarChar(100)
+  gateway         String   @default("192.168.1.1") @db.VarChar(100)
+  lxc_template    String   @default("local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst") @db.VarChar(300)
+  created_at      DateTime @default(now()) @db.Timestamp(6)
+  updated_at      DateTime @updatedAt      @db.Timestamp(6)
+  project         Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@map("project_proxmox_configs")
+}
+
+model ProjectPermission {
+  project_id String  @db.Uuid
+  user_id    String  @db.Uuid
+  role       String  @db.VarChar(20)
+  project    Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([project_id, user_id])
+  @@map("project_permissions")
+}
+
+model Node {
+  id           String    @id @default(uuid()) @db.Uuid
+  label        String    @db.VarChar(200)
+  type         String    @db.VarChar(50)
+  project_id   String    @db.Uuid
+  properties   Json      @default("{}")
+  position_x   Float     @default(0)
+  position_y   Float     @default(0)
+  created_at   DateTime  @default(now()) @db.Timestamp(6)
+  updated_at   DateTime  @updatedAt @db.Timestamp(6)
+  project      Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  source_edges Edge[]    @relation("SourceNode")
+  target_edges Edge[]    @relation("TargetNode")
+
+  @@index([project_id], map: "idx_nodes_project")
+  @@index([type], map: "idx_nodes_type")
+  @@map("nodes")
+}
+
+model Edge {
+  id             String    @id @default(uuid()) @db.Uuid
+  source_node_id String    @db.Uuid
+  target_node_id String    @db.Uuid
+  type           String    @default("network") @db.VarChar(50)
+  label          String?   @db.VarChar(200)
+  properties     Json      @default("{}")
+  project_id     String    @db.Uuid
+  created_at     DateTime  @default(now()) @db.Timestamp(6)
+  source_node    Node      @relation("SourceNode", fields: [source_node_id], references: [id], onDelete: Cascade)
+  target_node    Node      @relation("TargetNode", fields: [target_node_id], references: [id], onDelete: Cascade)
+  project        Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id], map: "idx_edges_project")
+  @@index([source_node_id], map: "idx_edges_source")
+  @@index([target_node_id], map: "idx_edges_target")
+  @@map("edges")
+}
+
+model NodeTemplate {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(200)
+  type        String    @db.VarChar(50)
+  properties  Json      @default("{}")
+  is_global   Boolean   @default(false)
+  created_by  String?   @db.Uuid
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+  creator     User?     @relation(fields: [created_by], references: [id], onDelete: SetNull)
+
+  @@index([is_global], map: "idx_templates_global")
+  @@map("node_templates")
+}

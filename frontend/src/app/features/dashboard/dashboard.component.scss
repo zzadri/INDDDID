@@ -1,0 +1,398 @@
+// ── Block: dashboard ─────────────────────────────────────────────────────────
+.dashboard {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+
+  // ── Element: header ──────────────────────────────────────────────────────
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 52px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 16px;
+  }
+
+  &__brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__brand-icon {
+    font-size: 22px;
+    color: var(--accent);
+  }
+
+  &__brand-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -.02em;
+  }
+
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  // ── Element: body ─────────────────────────────────────────────────────────
+  &__body {
+    flex: 1;
+    padding: 32px 24px;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  &__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  &__heading {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  // ── Element: error ────────────────────────────────────────────────────────
+  &__error {
+    color: var(--accent-red);
+    font-size: 13px;
+    background: rgba(247,129,102,.08);
+    border: 1px solid rgba(247,129,102,.2);
+    border-radius: 6px;
+    padding: 10px 14px;
+  }
+
+  // ── Element: loading ──────────────────────────────────────────────────────
+  &__loading {
+    display: flex;
+    justify-content: center;
+    padding: 48px;
+  }
+
+  // ── Element: empty state ──────────────────────────────────────────────────
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 64px 24px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  // ── Element: project grid ─────────────────────────────────────────────────
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+}
+
+// ── Block: user-chip ─────────────────────────────────────────────────────────
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 180px;
+
+  &__avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  &__name {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+}
+
+// ── Block: project-modal ──────────────────────────────────────────────────────
+.project-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  &__title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  &__body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  &__color-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  &__color-preview {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    transition: background .2s;
+    border: 2px solid rgba(255,255,255,.12);
+  }
+
+  &__palette {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  &__color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: transform .12s, border-color .12s;
+
+    &:hover { transform: scale(1.15); }
+
+    &--active {
+      border-color: var(--text);
+      transform: scale(1.15);
+    }
+  }
+
+  &__color-input {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    padding: 0;
+    cursor: pointer;
+    background: none;
+    overflow: hidden;
+    &::-webkit-color-swatch-wrapper { padding: 0; }
+    &::-webkit-color-swatch { border: none; border-radius: 50%; }
+  }
+
+  &__tags-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  &__footer {
+    display: flex;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+  }
+}
+
+// ── Block: confirm-modal (shared — also in modeler) ──────────────────────────
+.confirm-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 24px 20px;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow);
+  text-align: center;
+
+  &__icon {
+    width: 52px;
+    height: 52px;
+    background: rgba(247,129,102,.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+
+  &__title   { font-size: 16px; font-weight: 700; }
+  &__label   { font-size: 13px; color: var(--text); font-weight: 500; word-break: break-all; max-width: 100%; }
+  &__warning { font-size: 11px; color: var(--text-muted); }
+
+  &__actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+// ── Shared: modal overlay ─────────────────────────────────────────────────────
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+// ── Block: project-card ───────────────────────────────────────────────────────
+.project-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  &:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow);
+
+    .project-card__delete { opacity: 1; }
+  }
+
+  // ── Element: card header ────────────────────────────────────────────────
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__icon {
+    width: 36px;
+    height: 36px;
+    background: var(--bg-card);
+    border: 1px solid;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: visible;
+  }
+
+  &__color-dot {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid var(--bg-panel);
+  }
+
+  &__delete {
+    opacity: 0;
+    transition: opacity .15s;
+    color: var(--text-muted);
+    &:hover { color: var(--accent-red) !important; }
+  }
+
+  // ── Element: card body ───────────────────────────────────────────────────
+  &__body { display: flex; flex-direction: column; gap: 2px; }
+
+  &__name {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__description {
+    font-size: 12px;
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  &__tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  // ── Element: card footer ─────────────────────────────────────────────────
+  &__footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  &__stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  &__date { margin-left: auto; }
+}
+
+// ── Shared: spinner ───────────────────────────────────────────────────────────
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }

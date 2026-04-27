@@ -1,0 +1,54 @@
+{
+  "topology": {
+    "id": "topo-test-api",
+    "name": "SI Test – Import API",
+    "description": "Exemple de payload pour tester POST /api/import/modeler",
+    "version": "1.0"
+  },
+  "nodes": [
+    {
+      "id": "test-fw-01",
+      "label": "Firewall Test",
+      "type": "firewall",
+      "ip": "203.0.113.10",
+      "zone": "EDGE",
+      "position": { "x": 200, "y": 50 }
+    },
+    {
+      "id": "test-app-01",
+      "label": "App NodeJS",
+      "type": "application",
+      "ip": "10.0.1.5",
+      "port": 3000,
+      "zone": "APP",
+      "position": { "x": 200, "y": 180 }
+    },
+    {
+      "id": "test-db-01",
+      "label": "PostgreSQL Test",
+      "type": "database",
+      "ip": "10.0.2.5",
+      "engine": "PostgreSQL 16",
+      "zone": "DATA",
+      "position": { "x": 200, "y": 310 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "test-e-001",
+      "source": "test-fw-01",
+      "target": "test-app-01",
+      "type": "network",
+      "label": "HTTP :3000",
+      "port": 3000
+    },
+    {
+      "id": "test-e-002",
+      "source": "test-app-01",
+      "target": "test-db-01",
+      "type": "data_flow",
+      "label": "SQL :5432",
+      "port": 5432
+    }
+  ]
+}

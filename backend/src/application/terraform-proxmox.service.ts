@@ -170,7 +170,18 @@ variable "lxc_template" {
   default = "${cfg.lxc_template}"
 }
 
-variable "ssh_public_key" {
+variable "vm_user" {
+  type    = string
+  default = "ubuntu"
+}
+
+variable "vm_password" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "vm_ssh_key" {
   type    = string
   default = ""
 }`;
@@ -267,8 +278,9 @@ function generateVmResource(node: Node): string {
 ${ipConfig}
     }
     user_account {
-      username = "ubuntu"
-      keys     = var.ssh_public_key != "" ? [var.ssh_public_key] : []
+      username = var.vm_user
+      password = var.vm_password != "" ? var.vm_password : null
+      keys     = var.vm_ssh_key != "" ? [var.vm_ssh_key] : []
     }
   }
 
@@ -314,6 +326,11 @@ function generateLxcResource(node: Node, cfg: ProxmoxConfigResolved): string {
 
     ip_config {
 ${ipConfig}
+    }
+
+    user_account {
+      keys     = var.vm_ssh_key != "" ? [var.vm_ssh_key] : []
+      password = var.vm_password != "" ? var.vm_password : null
     }
   }
 
@@ -422,6 +439,9 @@ async function writeTfvars(workdir: string, cfg: ProxmoxConfigResolved): Promise
     lines.push(`proxmox_username = "${cfg.username}"`);
     lines.push(`proxmox_password = "${cfg.password ?? ''}"`);
   }
+  lines.push(`vm_user     = "${cfg.vm_user || 'ubuntu'}"`);
+  lines.push(`vm_password = "${(cfg.vm_password ?? '').replace(/"/g, '\\"')}"`);
+  lines.push(`vm_ssh_key  = "${(cfg.vm_ssh_key ?? '').replace(/"/g, '\\"')}"`);
   await fs.writeFile(path.join(workdir, 'terraform.tfvars'), lines.join('\n') + '\n', 'utf-8');
 }
 

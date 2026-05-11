@@ -470,6 +470,24 @@ pveam download local ubuntu-22.04-standard_22.04-1_amd64.tar.zst</pre>
                      placeholder="local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst">
             </div>
 
+            <div class="proxmox-cfg-modal__section-title">Accès aux VMs (cloud-init)</div>
+            <div class="proxmox-cfg-modal__grid">
+              <div class="form-group">
+                <label>Utilisateur VM</label>
+                <input type="text" [(ngModel)]="proxmoxConfigForm.vm_user" placeholder="ubuntu">
+              </div>
+              <div class="form-group">
+                <label>Mot de passe VM</label>
+                <input type="password" [(ngModel)]="proxmoxConfigForm.vm_password"
+                       placeholder="Mot de passe par défaut">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Clé SSH publique</label>
+              <textarea [(ngModel)]="proxmoxConfigForm.vm_ssh_key" rows="3"
+                        placeholder="ssh-rsa AAAA... (optionnel)"></textarea>
+            </div>
+
             <p class="deploy-modal__error" *ngIf="proxmoxConfigError">{{ proxmoxConfigError }}</p>
           </div>
         </div>
@@ -692,6 +710,24 @@ pveam download local ubuntu-22.04-standard_22.04-1_amd64.tar.zst</pre>
         <label>Template LXC</label>
         <input type="text" [(ngModel)]="proxmoxConfigForm.lxc_template"
                placeholder="local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst">
+      </div>
+
+      <div class="proxmox-cfg-modal__section-title">Accès aux VMs (cloud-init)</div>
+      <div class="proxmox-cfg-modal__grid">
+        <div class="form-group">
+          <label>Utilisateur VM</label>
+          <input type="text" [(ngModel)]="proxmoxConfigForm.vm_user" placeholder="ubuntu">
+        </div>
+        <div class="form-group">
+          <label>Mot de passe VM</label>
+          <input type="password" [(ngModel)]="proxmoxConfigForm.vm_password"
+                 [placeholder]="proxmoxConfig?.has_vm_password ? '•••••••• (laisser vide = conserver)' : 'Mot de passe par défaut'">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Clé SSH publique</label>
+        <textarea [(ngModel)]="proxmoxConfigForm.vm_ssh_key" rows="3"
+                  [placeholder]="proxmoxConfig?.vm_ssh_key ?? 'ssh-rsa AAAA... (optionnel)'"></textarea>
       </div>
 
       <p class="deploy-modal__error" *ngIf="proxmoxConfigError">{{ proxmoxConfigError }}</p>

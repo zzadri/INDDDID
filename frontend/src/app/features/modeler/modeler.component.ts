@@ -143,16 +143,19 @@ export class ModelerComponent implements OnInit, OnDestroy {
   proxmoxConfigSaving  = false;
   proxmoxConfigError   = '';
   proxmoxConfigForm: ProxmoxConfigInput & { credential_mode: 'token' | 'password' } = {
-    endpoint: '',
-    username: 'terraform-prov@pve',
-    api_token: '',
-    password: '',
-    node: 'pve',
-    template_vm_id: 9000,
-    storage: 'local-lvm',
-    gateway: '192.168.1.1',
-    lxc_template: 'local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst',
+    endpoint:        '',
+    username:        'terraform-prov@pve',
+    api_token:       '',
+    password:        '',
+    node:            'pve',
+    template_vm_id:  9000,
+    storage:         'local-lvm',
+    gateway:         '192.168.1.1',
+    lxc_template:    'local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst',
     credential_mode: 'token',
+    vm_user:         'ubuntu',
+    vm_password:     '',
+    vm_ssh_key:      '',
   };
 
   // ── Keyboard help modal ────────────────────────────────────────────────────
@@ -1019,6 +1022,9 @@ export class ModelerComponent implements OnInit, OnDestroy {
             gateway:         resp.config.gateway,
             lxc_template:    resp.config.lxc_template,
             credential_mode: resp.config.has_api_token ? 'token' : 'password',
+            vm_user:         resp.config.vm_user ?? 'ubuntu',
+            vm_password:     '',
+            vm_ssh_key:      resp.config.vm_ssh_key ?? '',
           };
         } else {
           this.proxmoxConfigForm = {
@@ -1032,6 +1038,9 @@ export class ModelerComponent implements OnInit, OnDestroy {
             gateway:         '192.168.1.1',
             lxc_template:    'local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst',
             credential_mode: 'token',
+            vm_user:         'ubuntu',
+            vm_password:     '',
+            vm_ssh_key:      '',
           };
         }
       },
@@ -1054,6 +1063,10 @@ export class ModelerComponent implements OnInit, OnDestroy {
       storage:        f.storage?.trim() || 'local-lvm',
       gateway:        f.gateway?.trim() || '192.168.1.1',
       lxc_template:   f.lxc_template?.trim() || 'local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst',
+      vm_user:        f.vm_user?.trim() || 'ubuntu',
+      // Empty string → undefined → service preserves existing encrypted value
+      vm_password:    f.vm_password?.trim() ? f.vm_password.trim() : undefined,
+      vm_ssh_key:     f.vm_ssh_key?.trim() || null,
     };
     // Only send the credential the user selected — leaves the other cleared.
     if (f.credential_mode === 'token') {

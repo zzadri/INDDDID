@@ -130,6 +130,9 @@ export class ModelerComponent implements OnInit, OnDestroy {
   // Proxmox / Terraform
   tfLoading          = false;
   tfRunning          = false;
+  tfRunningAction:   'plan' | 'apply' | 'destroy' | '' = '';
+  tfElapsed          = 0;
+  private tfTimer:   ReturnType<typeof setInterval> | null = null;
   tfHcl              = '';
   tfDeployableCount  = 0;
   tfSkippedTypes:    string[] = [];
@@ -229,6 +232,7 @@ export class ModelerComponent implements OnInit, OnDestroy {
     document.removeEventListener('keydown', this.keyHandler, { capture: true });
     this.themeSub?.unsubscribe();
     this.cy?.destroy();
+    if (this.tfTimer) clearInterval(this.tfTimer);
   }
 
   // ── Load ────────────────────────────────────────────────────────────────────
@@ -935,19 +939,41 @@ export class ModelerComponent implements OnInit, OnDestroy {
     });
   }
 
+  private startTfTimer(action: 'plan' | 'apply' | 'destroy'): void {
+    this.tfRunning = true;
+    this.tfRunningAction = action;
+    this.tfElapsed = 0;
+    this.tfError = '';
+    this.tfOutput = '';
+    if (this.tfTimer) clearInterval(this.tfTimer);
+    this.tfTimer = setInterval(() => { this.tfElapsed++; }, 1000);
+  }
+
+  private stopTfTimer(): void {
+    this.tfRunning = false;
+    this.tfRunningAction = '';
+    if (this.tfTimer) { clearInterval(this.tfTimer); this.tfTimer = null; }
+  }
+
+  get tfElapsedLabel(): string {
+    const m = Math.floor(this.tfElapsed / 60);
+    const s = this.tfElapsed % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
+
   terraformPlan(): void {
-    this.tfRunning = true; this.tfError = ''; this.tfOutput = '';
+    this.startTfTimer('plan');
     this.api.terraformPlan(this.projectId).subscribe({
-      next:  (r) => { this.tfRunning = false; this.tfOutput = r.output; if (!r.success) this.tfError = this.humanizeTfError(r.error ?? 'Plan échoué'); },
-      error: (err) => { this.tfRunning = false; this.tfError = this.humanizeTfError(err?.error?.error ?? 'Echec du terraform plan'); },
+      next:  (r) => { this.stopTfTimer(); this.tfOutput = r.output; if (!r.success) this.tfError = this.humanizeTfError(r.error ?? 'Plan échoué'); },
+      error: (err) => { this.stopTfTimer(); this.tfError = this.humanizeTfError(err?.error?.error ?? 'Echec du terraform plan'); },
     });
   }
 
   terraformApply(): void {
-    this.tfRunning = true; this.tfError = ''; this.tfOutput = '';
+    this.startTfTimer('apply');
     this.api.terraformApply(this.projectId).subscribe({
-      next:  (r) => { this.tfRunning = false; this.tfOutput = r.output; if (!r.success) this.tfError = this.humanizeTfError(r.error ?? 'Apply échoué'); },
-      error: (err) => { this.tfRunning = false; this.tfError = this.humanizeTfError(err?.error?.error ?? 'Echec du terraform apply'); },
+      next:  (r) => { this.stopTfTimer(); this.tfOutput = r.output; if (!r.success) this.tfError = this.humanizeTfError(r.error ?? 'Apply échoué'); },
+      error: (err) => { this.stopTfTimer(); this.tfError = this.humanizeTfError(err?.error?.error ?? 'Echec du terraform apply'); },
     });
   }
 
@@ -993,10 +1019,10 @@ export class ModelerComponent implements OnInit, OnDestroy {
   }
 
   private terraformDestroy(): void {
-    this.tfRunning = true; this.tfError = ''; this.tfOutput = '';
+    this.startTfTimer('destroy');
     this.api.terraformDestroy(this.projectId).subscribe({
-      next:  (r) => { this.tfRunning = false; this.tfOutput = r.output; if (!r.success) this.tfError = this.humanizeTfError(r.error ?? 'Destroy échoué'); },
-      error: (err) => { this.tfRunning = false; this.tfError = this.humanizeTfError(err?.error?.error ?? 'Echec du terraform destroy'); },
+      next:  (r) => { this.stopTfTimer(); this.tfOutput = r.output; if (!r.success) this.tfError = this.humanizeTfError(r.error ?? 'Destroy échoué'); },
+      error: (err) => { this.stopTfTimer(); this.tfError = this.humanizeTfError(err?.error?.error ?? 'Echec du terraform destroy'); },
     });
   }
 

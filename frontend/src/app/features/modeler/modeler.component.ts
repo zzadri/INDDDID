@@ -19,6 +19,8 @@ import {
   DockerStatusContainer,
   ProxmoxConfigPublic,
   ProxmoxConfigInput,
+  ProxmoxTemplateStatus,
+  ProxmoxTemplateEnsureResult,
 } from '../../domain/models';
 import { NODE_ICONS, svgIcon, IconEntry } from '../../shared/icons';
 import { NODE_SCHEMAS, PropertyField } from '../../shared/node-schemas';
@@ -161,6 +163,15 @@ export class ModelerComponent implements OnInit, OnDestroy {
     vm_ssh_key:      '',
   };
 
+  // ── Proxmox template panel ────────────────────────────────────────────────
+  tplStatus:   ProxmoxTemplateStatus | null = null;
+  tplLoading   = false;
+  tplRunning   = false;
+  tplElapsed   = 0;
+  tplError     = '';
+  tplMessage   = '';
+  private tplTimer: ReturnType<typeof setInterval> | null = null;
+
   // ── Keyboard help modal ────────────────────────────────────────────────────
   showHelp = false;
   readonly shortcuts: ShortcutGroup[] = [
@@ -232,7 +243,8 @@ export class ModelerComponent implements OnInit, OnDestroy {
     document.removeEventListener('keydown', this.keyHandler, { capture: true });
     this.themeSub?.unsubscribe();
     this.cy?.destroy();
-    if (this.tfTimer) clearInterval(this.tfTimer);
+    if (this.tfTimer)  clearInterval(this.tfTimer);
+    if (this.tplTimer) clearInterval(this.tplTimer);
   }
 
   // ── Load ────────────────────────────────────────────────────────────────────
@@ -1032,6 +1044,48 @@ export class ModelerComponent implements OnInit, OnDestroy {
     this.api.terraformDestroy(this.projectId).subscribe({
       next:  (r) => { this.stopTfTimer(); this.tfOutput = r.output; if (!r.success) this.tfError = this.humanizeTfError(r.error ?? 'Destroy échoué'); },
       error: (err) => { this.stopTfTimer(); this.tfError = this.humanizeTfError(err?.error?.error ?? 'Echec du terraform destroy'); },
+    });
+  }
+
+  // ── Proxmox template panel ────────────────────────────────────────────────
+
+  get tplElapsedLabel(): string {
+    const m = Math.floor(this.tplElapsed / 60);
+    const s = this.tplElapsed % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
+
+  checkProxmoxTemplate(): void {
+    this.tplLoading = true;
+    this.tplError   = '';
+    this.tplMessage = '';
+    this.api.checkProxmoxTemplate(this.projectId).subscribe({
+      next:  (s) => { this.tplStatus = s; this.tplLoading = false; },
+      error: (err) => { this.tplLoading = false; this.tplError = err?.error?.error ?? 'Impossible de vérifier le template'; },
+    });
+  }
+
+  ensureProxmoxTemplate(): void {
+    this.tplRunning = true;
+    this.tplError   = '';
+    this.tplMessage = '';
+    this.tplElapsed = 0;
+    if (this.tplTimer) clearInterval(this.tplTimer);
+    this.tplTimer = setInterval(() => { this.tplElapsed++; }, 1000);
+
+    this.api.ensureProxmoxTemplate(this.projectId).subscribe({
+      next: (r: ProxmoxTemplateEnsureResult) => {
+        this.tplRunning = false;
+        if (this.tplTimer) { clearInterval(this.tplTimer); this.tplTimer = null; }
+        this.tplMessage = r.message;
+        // Refresh status after creation
+        this.checkProxmoxTemplate();
+      },
+      error: (err) => {
+        this.tplRunning = false;
+        if (this.tplTimer) { clearInterval(this.tplTimer); this.tplTimer = null; }
+        this.tplError = err?.error?.error ?? 'Erreur lors de la création du template';
+      },
     });
   }
 

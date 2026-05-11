@@ -161,3 +161,16 @@ export interface ProxmoxConfigInput {
   vm_password?:    string | null;
   vm_ssh_key?:     string | null;
 }
+
+export interface ProxmoxTemplateStatus {
+  vm_id:      number;
+  exists:     boolean;
+  image_url:  string;
+  image_name: string;
+  has_cred:   boolean;
+}
+
+export interface ProxmoxTemplateEnsureResult {
+  created: boolean;
+  message: string;
+}

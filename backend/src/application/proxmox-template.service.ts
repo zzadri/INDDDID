@@ -17,6 +17,8 @@ const CLOUD_IMAGE_URL  = 'https://cloud-images.ubuntu.com/jammy/current/jammy-se
 const CLOUD_IMAGE_NAME = 'jammy-server-cloudimg-amd64.img';
 const TEMPLATE_NAME    = 'ubuntu-2204-template';
 const ISO_STORAGE      = 'local';
+// Absolute path used in import-from — bypasses Proxmox content-type check (iso vs images).
+const ISO_LOCAL_PATH   = '/var/lib/vz/template/iso';
 
 // ── HTTP client ─────────────────────────────────────────────────────────────
 
@@ -206,7 +208,8 @@ async function createTemplateVm(cfg: ProxmoxConfigResolved): Promise<void> {
       serial0:   'socket',
       vga:       'serial0',
       agent:     'enabled=1',
-      scsi0:     `${cfg.storage}:0,import-from=${ISO_STORAGE}:iso/${CLOUD_IMAGE_NAME},iothread=1,discard=on`,
+      // Absolute path bypasses Proxmox content-type check (iso != images).
+      scsi0:     `${cfg.storage}:0,import-from=${ISO_LOCAL_PATH}/${CLOUD_IMAGE_NAME},iothread=1,discard=on`,
       ide2:      `${cfg.storage}:cloudinit`,
       boot:      'order=scsi0',
     },
@@ -238,5 +241,27 @@ export async function ensureTemplate(cfg: ProxmoxConfigResolved): Promise<{ crea
   await createTemplateVm(cfg);
   await convertToTemplate(cfg);
 
-  return { created: true, message: `Template VM ${cfg.template_vm_id} recreated from ${CLOUD_IMAGE_URL}` };
+  return { created: true, message: `Template VM ${cfg.template_vm_id} créé depuis ${CLOUD_IMAGE_URL}` };
+}
+
+export interface TemplateStatus {
+  vm_id:       number;
+  exists:      boolean;
+  image_url:   string;
+  image_name:  string;
+  has_cred:    boolean;
+}
+
+/** Read-only check — does NOT create. Safe to call any time. */
+export async function checkTemplate(cfg: ProxmoxConfigResolved): Promise<TemplateStatus> {
+  const has_cred = !!(cfg.api_token || cfg.password);
+  if (!has_cred) {
+    return { vm_id: cfg.template_vm_id, exists: false, image_url: CLOUD_IMAGE_URL, image_name: CLOUD_IMAGE_NAME, has_cred };
+  }
+  try {
+    const exists = await templateExists(cfg);
+    return { vm_id: cfg.template_vm_id, exists, image_url: CLOUD_IMAGE_URL, image_name: CLOUD_IMAGE_NAME, has_cred };
+  } catch {
+    return { vm_id: cfg.template_vm_id, exists: false, image_url: CLOUD_IMAGE_URL, image_name: CLOUD_IMAGE_NAME, has_cred };
+  }
 }

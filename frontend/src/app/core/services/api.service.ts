@@ -7,6 +7,7 @@ import {
   DockerComposePreview, DockerDeployResult, DockerStatusResponse,
   TerraformPreview, TerraformResult,
   ProxmoxConfigPublic, ProxmoxConfigResponse, ProxmoxConfigInput,
+  ProxmoxTemplateStatus, ProxmoxTemplateEnsureResult,
 } from '../../domain/models';
 
 @Injectable({ providedIn: 'root' })
@@ -108,5 +109,13 @@ export class ApiService {
   }
   deleteProxmoxConfig(projectId: string): Observable<void> {
     return this.http.delete<void>(`/api/projects/${projectId}/proxmox-config`);
+  }
+
+  // ── Proxmox template ─────────────────────────────────────────────────────
+  checkProxmoxTemplate(projectId: string): Observable<ProxmoxTemplateStatus> {
+    return this.http.get<ProxmoxTemplateStatus>(`/api/projects/${projectId}/proxmox-template`);
+  }
+  ensureProxmoxTemplate(projectId: string): Observable<ProxmoxTemplateEnsureResult> {
+    return this.http.post<ProxmoxTemplateEnsureResult>(`/api/projects/${projectId}/proxmox-template/ensure`, {});
   }
 }

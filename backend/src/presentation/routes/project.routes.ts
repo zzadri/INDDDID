@@ -8,6 +8,7 @@ import * as projectService from '../../application/project.service';
 import * as dockerDeployService     from '../../application/docker-deploy.service';
 import * as terraformProxmoxService from '../../application/terraform-proxmox.service';
 import * as proxmoxConfigService    from '../../application/proxmox-config.service';
+import * as proxmoxTemplateService  from '../../application/proxmox-template.service';
 import { Edge, JwtPayload, Node } from '../../domain/entities';
 
 const router = Router();
@@ -115,6 +116,28 @@ router.delete('/:id/proxmox-config', validate(projectIdParamsSchema, 'params'), 
     const ok = await proxmoxConfigService.deleteConfig(pid(req));
     if (!ok) { res.status(404).json({ error: 'No Proxmox config for this project' }); return; }
     res.status(204).send();
+  } catch (err) { next(err); }
+});
+
+// ── Proxmox template management ─────────────────────────────────────────────
+
+router.get('/:id/proxmox-template', validate(projectIdParamsSchema, 'params'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const p = await projectService.getProjectById(pid(req), uid(req));
+    if (!p) { res.status(404).json({ error: 'Project not found' }); return; }
+    const cfg = await proxmoxConfigService.getResolvedConfig(pid(req));
+    const status = await proxmoxTemplateService.checkTemplate(cfg);
+    res.json(status);
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/proxmox-template/ensure', validate(projectIdParamsSchema, 'params'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const p = await projectService.getProjectById(pid(req), uid(req));
+    if (!p) { res.status(404).json({ error: 'Project not found' }); return; }
+    const cfg = await proxmoxConfigService.getResolvedConfig(pid(req));
+    const result = await proxmoxTemplateService.ensureTemplate(cfg);
+    res.json(result);
   } catch (err) { next(err); }
 });
 

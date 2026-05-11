@@ -116,7 +116,7 @@
         <button class="side-panel__tab" [class.side-panel__tab--active]="rightPanel === 'properties'"
                 (click)="rightPanel = 'properties'">Propriétés</button>
         <button class="side-panel__tab" [class.side-panel__tab--active]="rightPanel === 'templates'"
-                (click)="rightPanel = 'templates'">Templates</button>
+                (click)="rightPanel = 'templates'; checkProxmoxTemplate()">VM Template</button>
       </div>
 
       <!-- ── Properties panel ── -->
@@ -240,37 +240,92 @@
         </div>
       </div>
 
-      <!-- ── Templates panel ── -->
-      <div class="side-panel__content" *ngIf="rightPanel === 'templates'">
-        <p class="text-muted" style="font-size:12px; padding: 4px 0 8px">
-          Glissez sur le canvas ou double-cliquez pour ajouter.
-        </p>
+      <!-- ── VM Template panel ── -->
+      <div class="side-panel__content tpl-vm-panel" *ngIf="rightPanel === 'templates'">
 
-        <div class="tpl-panel__list" *ngIf="templates.length > 0; else noTemplates">
-          <div class="tpl-panel__card"
-               *ngFor="let tpl of templates"
-               draggable="true"
-               (dragstart)="onTemplateDragStart($event, tpl)"
-               (dblclick)="addNodeFromTemplate(tpl, 200, 200)">
-            <span class="tpl-panel__card-icon" [innerHTML]="safeIcon(tpl.type, 16)"></span>
-            <div class="tpl-panel__card-info">
-              <span class="tpl-panel__card-name">{{ tpl.name }}</span>
-              <span class="badge badge--sm" [class]="'badge--' + tpl.type">{{ tpl.type }}</span>
-            </div>
-            <span class="tpl-panel__card-global" *ngIf="tpl.is_global" title="Template global">★</span>
-            <button class="btn-ghost btn-icon" (click)="deleteTemplate(tpl.id)" *ngIf="!tpl.is_global" title="Supprimer">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </div>
+        <!-- Loading -->
+        <div class="tpl-vm-panel__loading" *ngIf="tplLoading">
+          <div class="spinner"></div>
+          <span class="text-muted">Vérification…</span>
         </div>
 
-        <ng-template #noTemplates>
-          <p class="text-faint" style="font-size:11px; text-align:center; padding:16px 0">
-            Aucun template.<br>Sélectionnez un nœud et sauvegardez-le comme template.
+        <!-- No config -->
+        <div class="tpl-vm-panel__no-config" *ngIf="!tplLoading && !proxmoxConfig">
+          <p class="text-faint" style="font-size:12px; text-align:center">
+            Configurez Proxmox d'abord<br>(onglet Deploy → Config Proxmox).
           </p>
-        </ng-template>
+        </div>
+
+        <!-- Status card -->
+        <ng-container *ngIf="!tplLoading && proxmoxConfig">
+          <div class="tpl-vm-panel__status-card"
+               [class.tpl-vm-panel__status-card--ok]="tplStatus?.exists"
+               [class.tpl-vm-panel__status-card--missing]="tplStatus && !tplStatus.exists">
+            <div class="tpl-vm-panel__status-row">
+              <span class="tpl-vm-panel__status-icon">
+                <ng-container *ngIf="tplStatus?.exists">✅</ng-container>
+                <ng-container *ngIf="tplStatus && !tplStatus.exists">❌</ng-container>
+                <ng-container *ngIf="!tplStatus">—</ng-container>
+              </span>
+              <div class="tpl-vm-panel__status-info">
+                <span class="tpl-vm-panel__status-title">
+                  VM Template #{{ tplStatus?.vm_id ?? proxmoxConfig.template_vm_id }}
+                </span>
+                <span class="tpl-vm-panel__status-sub">
+                  {{ tplStatus?.exists ? 'Présent dans Proxmox' : tplStatus ? 'Absent — à créer' : 'Non vérifié' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="tpl-vm-panel__meta" *ngIf="tplStatus">
+              <div class="tpl-vm-panel__meta-row">
+                <span class="text-faint">Image</span>
+                <span class="tpl-vm-panel__meta-val truncate" [title]="tplStatus.image_name">
+                  {{ tplStatus.image_name }}
+                </span>
+              </div>
+              <div class="tpl-vm-panel__meta-row">
+                <span class="text-faint">Auth</span>
+                <span class="tpl-vm-panel__meta-val">{{ tplStatus.has_cred ? '✓ Configurée' : '✗ Manquante' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Running overlay -->
+          <div class="tpl-vm-panel__running" *ngIf="tplRunning">
+            <div class="spinner"></div>
+            <span class="tpl-vm-panel__running-label">Création template…</span>
+            <span class="tpl-vm-panel__running-elapsed">{{ tplElapsedLabel }}</span>
+            <span class="text-faint" style="font-size:10px; text-align:center">
+              Download image + création VM<br>peut prendre 10–20 min
+            </span>
+          </div>
+
+          <!-- Message / error -->
+          <p class="tpl-vm-panel__message" *ngIf="tplMessage && !tplRunning">{{ tplMessage }}</p>
+          <p class="tpl-vm-panel__error"   *ngIf="tplError">{{ tplError }}</p>
+
+          <!-- Actions -->
+          <div class="tpl-vm-panel__actions" *ngIf="!tplRunning">
+            <button (click)="checkProxmoxTemplate()" [disabled]="tplLoading" class="btn-ghost btn-sm">
+              ↻ Rafraîchir
+            </button>
+            <button class="btn-primary btn-sm"
+                    (click)="ensureProxmoxTemplate()"
+                    [disabled]="tplLoading || tplRunning">
+              {{ tplStatus?.exists ? '↺ Recréer le template' : '⚡ Créer le template' }}
+            </button>
+          </div>
+
+          <div class="tpl-vm-panel__info">
+            <p>Le template est une VM Ubuntu 22.04 cloud-image clonée pour chaque déploiement.</p>
+            <p>
+              <strong>ID :</strong> {{ proxmoxConfig.template_vm_id }} ·
+              <strong>Storage :</strong> {{ proxmoxConfig.storage }}
+            </p>
+            <p class="text-faint">Si absent → Blueprint le télécharge et crée automatiquement avant l'Apply.</p>
+          </div>
+        </ng-container>
       </div>
     </aside>
   </div>

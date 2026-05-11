@@ -3,9 +3,10 @@ import { NodeType } from '../domain/models';
 export interface PropertyField {
   key:          string;
   label:        string;
-  type:         'text' | 'number' | 'select' | 'boolean' | 'textarea';
+  type:         'text' | 'number' | 'select' | 'boolean' | 'textarea' | 'preset';
   placeholder?: string;
   options?:     string[];
+  unit?:        string;
 }
 
 export const NODE_SCHEMAS: Record<NodeType, PropertyField[]> = {
@@ -15,9 +16,9 @@ export const NODE_SCHEMAS: Record<NodeType, PropertyField[]> = {
     { key: 'os',                 label: 'Système d\'exploitation', type: 'select', options: ['Ubuntu 22.04', 'Ubuntu 20.04', 'Debian 12', 'Debian 11', 'RHEL 9', 'CentOS Stream 9', 'Windows Server 2022', 'Windows Server 2019', 'Alpine Linux'] },
     { key: 'role',               label: 'Rôle',                type: 'text',     placeholder: 'web, app, backup, monitoring...' },
     { key: 'zone',               label: 'Zone réseau',         type: 'text',     placeholder: 'DMZ, APP, DATA, CORE...' },
-    { key: 'cpu',                label: 'CPU',                 type: 'text',     placeholder: '4 vCPU' },
-    { key: 'ram',                label: 'RAM',                 type: 'text',     placeholder: '16 GB' },
-    { key: 'storage',            label: 'Stockage',            type: 'text',     placeholder: '500 GB SSD' },
+    { key: 'cpu',     label: 'CPU (vCores)',  type: 'preset', options: ['1', '2', '4', '8', '16', '32'] },
+    { key: 'ram',     label: 'RAM (Go)',      type: 'preset', options: ['1', '2', '4', '8', '16', '32', '64', '128'] },
+    { key: 'storage', label: 'Stockage (Go)', type: 'preset', options: ['20', '50', '100', '200', '500', '1000'] },
     { key: 'notes',              label: 'Notes',               type: 'textarea', placeholder: 'Informations complémentaires...' },
   ],
   database: [
@@ -128,9 +129,9 @@ export const NODE_SCHEMAS: Record<NodeType, PropertyField[]> = {
     { key: 'ip',         label: 'Adresse IP',          type: 'text',    placeholder: '192.168.1.10' },
     { key: 'hostname',   label: 'Hostname',             type: 'text',    placeholder: 'vm-web-01' },
     { key: 'os',         label: 'Système d\'exploitation', type: 'select', options: ['Ubuntu 22.04', 'Ubuntu 20.04', 'Debian 12', 'Alpine Linux', 'Windows Server 2022', 'RHEL 9', 'CentOS Stream 9'] },
-    { key: 'cpu',        label: 'CPU (cœurs)',          type: 'number',  placeholder: '2' },
-    { key: 'ram',        label: 'RAM (Go)',             type: 'number',  placeholder: '2' },
-    { key: 'disk',       label: 'Disque (Go)',          type: 'number',  placeholder: '20' },
+    { key: 'cpu',  label: 'CPU (vCores)',  type: 'preset', options: ['1', '2', '4', '8', '16', '32'] },
+    { key: 'ram',  label: 'RAM (Go)',      type: 'preset', options: ['1', '2', '4', '8', '16', '32', '64'] },
+    { key: 'disk', label: 'Disque (Go)',   type: 'preset', options: ['10', '20', '40', '80', '100', '200', '500'] },
     { key: 'hypervisor', label: 'Hyperviseur',          type: 'select',  options: ['Proxmox VE', 'VMware ESXi', 'Hyper-V', 'KVM', 'VirtualBox', 'Xen'] },
     { key: 'vlan',       label: 'VLAN',                 type: 'number' },
     { key: 'zone',       label: 'Zone réseau',          type: 'text',    placeholder: 'DMZ, APP, DATA...' },
@@ -139,8 +140,8 @@ export const NODE_SCHEMAS: Record<NodeType, PropertyField[]> = {
   container: [
     { key: 'image',      label: 'Image',                type: 'text',    placeholder: 'nginx:alpine, ubuntu:22.04...' },
     { key: 'ip',         label: 'Adresse IP',           type: 'text',    placeholder: '192.168.1.20 (vide = DHCP)' },
-    { key: 'cpu',        label: 'CPU (cœurs)',          type: 'number',  placeholder: '1' },
-    { key: 'ram',        label: 'RAM (Mo)',             type: 'number',  placeholder: '512' },
+    { key: 'cpu', label: 'CPU (cœurs)', type: 'preset', options: ['0.5', '1', '2', '4', '8'] },
+    { key: 'ram', label: 'RAM (Mo)',    type: 'preset', options: ['256', '512', '1024', '2048', '4096', '8192'] },
     { key: 'port',       label: 'Port exposé',          type: 'number',  placeholder: '80' },
     { key: 'hostname',   label: 'Hostname',             type: 'text',    placeholder: 'ct-nginx-01' },
     { key: 'runtime',    label: 'Runtime',              type: 'select',  options: ['Docker', 'Podman', 'Proxmox LXC', 'containerd'] },

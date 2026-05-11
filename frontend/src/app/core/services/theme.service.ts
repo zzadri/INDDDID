@@ -4,7 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
   private dark$ = new BehaviorSubject<boolean>(
-    localStorage.getItem('inddid_theme') !== 'light',
+    localStorage.getItem('blueprint_theme') !== 'light',
   );
 
   readonly isDark$ = this.dark$.asObservable();
@@ -15,7 +15,7 @@ export class ThemeService {
   toggle(): void {
     const next = !this.dark$.value;
     this.dark$.next(next);
-    localStorage.setItem('inddid_theme', next ? 'dark' : 'light');
+    localStorage.setItem('blueprint_theme', next ? 'dark' : 'light');
     this.apply(next);
   }
 

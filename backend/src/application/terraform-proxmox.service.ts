@@ -22,7 +22,7 @@ import { ensureTemplate } from './proxmox-template.service';
 
 const execAsync = promisify(exec);
 
-const TF_WORKDIR = path.join(process.env.DEPLOYMENTS_DIR ?? '/tmp/inddid-deployments', 'terraform');
+const TF_WORKDIR = path.join(process.env.DEPLOYMENTS_DIR ?? '/tmp/blueprint-deployments', 'terraform');
 
 // Long-running terraform ops (clone + cloud-init boot can take >5 min).
 const TF_EXEC_OPTS = { maxBuffer: 64 * 1024 * 1024, timeout: 30 * 60 * 1000 } as const;
@@ -182,9 +182,9 @@ function generateVmResource(node: Node): string {
 
   return `resource "proxmox_virtual_environment_vm" "${name}" {
   name        = "${dnsName}"
-  description = "INDDID – ${node.type} – ${node.label.replace(/"/g, '\\"')}"
+  description = "Blueprint – ${node.type} – ${node.label.replace(/"/g, '\\"')}"
   node_name   = var.proxmox_node
-  tags        = ["inddid", "${node.type}"]
+  tags        = ["blueprint", "${node.type}"]
   on_boot     = true
 
   # Destroy = stop (brutal). Resource is deleted right after, no need for graceful shutdown.
@@ -275,9 +275,9 @@ function generateLxcResource(node: Node, cfg: ProxmoxConfigResolved): string {
   const dnsName = slugifyDnsName(node.label, node.id);
 
   return `resource "proxmox_virtual_environment_container" "${name}" {
-  description = "INDDID – container – ${node.label.replace(/"/g, '\\"')}"
+  description = "Blueprint – container – ${node.label.replace(/"/g, '\\"')}"
   node_name   = var.proxmox_node
-  tags        = ["inddid", "container"]
+  tags        = ["blueprint", "container"]
 
   # Destroy = stop (brutal) — container is deleted right after.
   start_on_boot = true
@@ -323,7 +323,7 @@ function generateHCL(
   ).join('\n\n');
 
   return `# ============================================================
-# INDDID POC V1 — Proxmox Terraform deployment
+# Blueprint — Proxmox Terraform deployment
 # Project : ${projectName}
 # ID      : ${projectId}
 # Generated: ${new Date().toISOString()}

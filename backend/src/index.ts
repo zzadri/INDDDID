@@ -5,7 +5,7 @@ import app from './app';
 async function bootstrap(): Promise<void> {
   await waitForDb();
   app.listen(env.PORT, () => {
-    console.log(`INDDID backend v2 on :${env.PORT} [${env.NODE_ENV}]`);
+    console.log(`Blueprint backend on :${env.PORT} [${env.NODE_ENV}]`);
   });
 }
 

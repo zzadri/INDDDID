@@ -1,5 +1,5 @@
 -- ============================================================
--- INDDID POC V1 — Seed data v3 (UUID PKs)
+-- Blueprint — Seed data v3 (UUID PKs)
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -23,7 +23,7 @@ BEGIN
 
   -- ── Utilisateur démo (password: demo1234) ──────────────────────────────
   INSERT INTO users (email, password_hash, display_name) VALUES
-    ('demo@inddid.local', crypt('demo1234', gen_salt('bf', 10)), 'Demo User')
+    ('demo@blueprint.local', crypt('demo1234', gen_salt('bf', 10)), 'Demo User')
   RETURNING id INTO v_user_id;
 
   -- ── Projet démo ────────────────────────────────────────────────────────

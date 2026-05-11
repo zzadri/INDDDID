@@ -57,6 +57,7 @@ export class ModelerComponent implements OnInit, OnDestroy {
     'network', 'router', 'switch', 'cloud', 'service',
     'workstation', 'user', 'vm', 'container',
   ];
+  readonly deployableTypes = new Set<NodeType>(['server', 'application', 'database', 'workstation', 'vm', 'container']);
   nodeIcons = NODE_ICONS.filter(icon => this.paletteNodeTypes.includes(icon.type));
   loading = true;
   saving  = false;
@@ -946,7 +947,14 @@ export class ModelerComponent implements OnInit, OnDestroy {
     });
   }
 
-  terraformDestroy(): void {
+  terraformDestroyConfirm(): void {
+    this.openDeleteConfirm(
+      `Détruire toutes les ressources Proxmox du projet "${this.project.name}" ?`,
+      () => this.terraformDestroy(),
+    );
+  }
+
+  private terraformDestroy(): void {
     this.tfRunning = true; this.tfError = ''; this.tfOutput = '';
     this.api.terraformDestroy(this.projectId).subscribe({
       next:  (r) => { this.tfRunning = false; this.tfOutput = r.output; if (!r.success) this.tfError = r.error ?? 'Destroy échoué'; },

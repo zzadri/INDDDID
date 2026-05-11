@@ -1,11 +1,11 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: inddid-postgres
+    container_name: blueprint-postgres
     environment:
-      POSTGRES_DB:       ${DB_NAME:-inddid}
-      POSTGRES_USER:     ${DB_USER:-inddid}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-inddid_secret}
+      POSTGRES_DB:       ${DB_NAME:-blueprint}
+      POSTGRES_USER:     ${DB_USER:-blueprint}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-blueprint_secret}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
@@ -13,9 +13,9 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - inddid-net
+      - blueprint-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-inddid} -d ${DB_NAME:-inddid}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-blueprint} -d ${DB_NAME:-blueprint}"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -24,23 +24,23 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: inddid-backend
+    container_name: blueprint-backend
     user: "0:0"
     environment:
       NODE_ENV:    production
       PORT:        3000
       DB_HOST:     postgres
       DB_PORT:     5432
-      DB_NAME:     ${DB_NAME:-inddid}
-      DB_USER:     ${DB_USER:-inddid}
-      DB_PASSWORD: ${DB_PASSWORD:-inddid_secret}
-      DATABASE_URL: postgresql://${DB_USER:-inddid}:${DB_PASSWORD:-inddid_secret}@postgres:5432/${DB_NAME:-inddid}?schema=public
-      JWT_SECRET:  ${JWT_SECRET:-inddid_jwt_super_secret_change_in_prod}
-      AES_SECRET:  ${AES_SECRET:-inddid_dev_aes_secret_change_in_prod}
+      DB_NAME:     ${DB_NAME:-blueprint}
+      DB_USER:     ${DB_USER:-blueprint}
+      DB_PASSWORD: ${DB_PASSWORD:-blueprint_secret}
+      DATABASE_URL: postgresql://${DB_USER:-blueprint}:${DB_PASSWORD:-blueprint_secret}@postgres:5432/${DB_NAME:-blueprint}?schema=public
+      JWT_SECRET:  ${JWT_SECRET:-blueprint_jwt_super_secret_change_in_prod}
+      AES_SECRET:  ${AES_SECRET:-blueprint_dev_aes_secret_change_in_prod}
       CORS_ORIGIN: http://localhost:4200
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       DOCKER_DEPLOY_ENABLED: ${DOCKER_DEPLOY_ENABLED:-true}
-      DEPLOYMENTS_DIR: /tmp/inddid-deployments
+      DEPLOYMENTS_DIR: /tmp/blueprint-deployments
       # Proxmox endpoints use self-signed TLS by default — skip cert check
       # for preflight HTTP calls (terraform bpg provider uses insecure=true).
       NODE_TLS_REJECT_UNAUTHORIZED: '0'
@@ -50,9 +50,9 @@ services:
       - "3000:3000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - backend_deployments:/tmp/inddid-deployments
+      - backend_deployments:/tmp/blueprint-deployments
     networks:
-      - inddid-net
+      - blueprint-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,11 +62,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: inddid-frontend
+    container_name: blueprint-frontend
     ports:
       - "4200:80"
     networks:
-      - inddid-net
+      - blueprint-net
     depends_on:
       - backend
     restart: unless-stopped
@@ -76,5 +76,5 @@ volumes:
   backend_deployments:
 
 networks:
-  inddid-net:
+  blueprint-net:
     driver: bridge

@@ -353,7 +353,7 @@ function resolveVolumes(
 function buildProjectKey(projectName: string, projectId: string): string {
   const namePart = slug(projectName).slice(0, 24);
   const idPart = slug(projectId).slice(0, 8);
-  return `inddid-${namePart}-${idPart}`.slice(0, 63);
+  return `blueprint-${namePart}-${idPart}`.slice(0, 63);
 }
 
 function renderCompose(projectKey: string, services: ServiceSpec[], namedVolumes: Set<string>): string {
@@ -413,7 +413,7 @@ function renderCompose(projectKey: string, services: ServiceSpec[], namedVolumes
     }
 
     lines.push('    networks:');
-    lines.push('      - inddid_net');
+    lines.push('      - blueprint_net');
   }
 
   if (namedVolumes.size > 0) {
@@ -424,7 +424,7 @@ function renderCompose(projectKey: string, services: ServiceSpec[], namedVolumes
   }
 
   lines.push('networks:');
-  lines.push('  inddid_net:');
+  lines.push('  blueprint_net:');
   lines.push('    driver: bridge');
 
   return `${lines.join('\n')}\n`;
@@ -477,9 +477,9 @@ function buildComposeFromGraph(projectId: string, projectName: string, nodes: No
       environment,
       volumes: volumeInfo.volumes,
       labels: {
-        'inddid.project': projectId,
-        'inddid.node_id': node.id,
-        'inddid.node_type': node.type,
+        'blueprint.project': projectId,
+        'blueprint.node_id': node.id,
+        'blueprint.node_type': node.type,
       },
     };
 
@@ -545,7 +545,7 @@ function buildComposeFromGraph(projectId: string, projectName: string, nodes: No
 
   const services = Array.from(serviceByName.values()).sort((a, b) => a.name.localeCompare(b.name));
   const compose = renderCompose(projectKey, services, namedVolumes);
-  const deployRoot = DEPLOYMENTS_DIR || path.join(os.tmpdir(), 'inddid-deployments');
+  const deployRoot = DEPLOYMENTS_DIR || path.join(os.tmpdir(), 'blueprint-deployments');
   const composeFile = path.join(deployRoot, projectId, 'docker-compose.generated.yml');
 
   return {
@@ -654,7 +654,7 @@ export async function deployProjectDown(
     'ps',
     '-aq',
     '--filter',
-    `label=inddid.project=${projectId}`,
+    `label=blueprint.project=${projectId}`,
   ]);
 
   if (!listResult.success) {
@@ -697,7 +697,7 @@ export async function getDeploymentStatus(
   const statusResult = await runDocker([
     'ps',
     '--filter',
-    `label=inddid.project=${projectId}`,
+    `label=blueprint.project=${projectId}`,
     '--format',
     '{{.Names}}|{{.Image}}|{{.Status}}',
   ]);

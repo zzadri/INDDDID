@@ -1,6 +1,6 @@
 -- ============================================================
--- INDDID POC V1 — Schéma PostgreSQL v3 (UUID PKs)
--- Cartographie dynamique du Système d'Information
+-- Blueprint — Schéma PostgreSQL v3 (UUID PKs)
+-- Infrastructure Deployment Tool
 -- ============================================================
 
 -- UUID generation (native depuis PostgreSQL 13)

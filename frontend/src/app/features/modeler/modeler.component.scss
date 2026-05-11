@@ -183,6 +183,29 @@
     padding: 8px;
     text-align: center;
   }
+
+  // ── Element: deploy badge ────────────────────────────────────────────────
+  &__deploy-badge {
+    font-size: 10px;
+    margin-left: auto;
+    opacity: 0.5;
+    flex-shrink: 0;
+
+    &--yes { opacity: 1; color: #3fb950; }
+  }
+
+  // ── Element: legend ──────────────────────────────────────────────────────
+  &__legend {
+    display: flex;
+    gap: 8px;
+    padding: 8px 4px 2px;
+    font-size: 10px;
+    color: var(--text-faint);
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+
+  &__legend-icon { margin-right: 2px; }
 }
 
 // ── Block: canvas ─────────────────────────────────────────────────────────────
@@ -293,6 +316,36 @@
     letter-spacing: .06em;
     color: var(--text-faint);
     margin-top: 6px;
+  }
+
+  // ── Element: preset button group ────────────────────────────────────────
+  &__preset-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  &__preset-btn {
+    padding: 3px 8px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+
+    &:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    &--active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
   }
 
   // ── Element: bool field ──────────────────────────────────────────────────

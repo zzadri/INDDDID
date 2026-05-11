@@ -10,7 +10,7 @@
 
     <div class="modeler__brand">
       <span class="modeler__brand-icon">◈</span>
-      <span class="modeler__brand-name">INDDID</span>
+      <span class="modeler__brand-name">Blueprint</span>
     </div>
 
     <div class="modeler__project-name truncate">{{ project.name }}</div>
@@ -73,7 +73,7 @@
 
     <!-- ── Left palette — components only ── -->
     <aside class="palette">
-      <div class="palette__title">Composants deployables (MVP)</div>
+      <div class="palette__title">Composants</div>
 
       <div class="palette__item"
            *ngFor="let icon of nodeIcons"
@@ -83,6 +83,16 @@
            [title]="icon.label + ' — glisser ou double-clic'">
         <span class="palette__icon" [innerHTML]="safeIcon(icon.type, 18)"></span>
         <span class="palette__label">{{ icon.label }}</span>
+        <span class="palette__deploy-badge"
+              [class.palette__deploy-badge--yes]="deployableTypes.has(icon.type)"
+              [title]="deployableTypes.has(icon.type) ? 'Déployable via Terraform' : 'Visualisation uniquement'">
+          {{ deployableTypes.has(icon.type) ? '⚡' : '◉' }}
+        </span>
+      </div>
+
+      <div class="palette__legend">
+        <span><span class="palette__legend-icon">⚡</span> Terraform</span>
+        <span><span class="palette__legend-icon">◉</span> Schéma</span>
       </div>
     </aside>
 
@@ -139,6 +149,12 @@
                 <input type="checkbox" [(ngModel)]="nodeForm[field.key]">
                 <span>Activé</span>
               </label>
+              <div class="prop-panel__preset-group" *ngSwitchCase="'preset'">
+                <button *ngFor="let o of field.options" type="button"
+                  class="prop-panel__preset-btn"
+                  [class.prop-panel__preset-btn--active]="nodeForm[field.key]?.toString() === o"
+                  (click)="nodeForm[field.key] = o">{{ o }}</button>
+              </div>
             </ng-container>
           </div>
 
@@ -325,7 +341,7 @@
             </div>
           </div>
           <ng-template #deployEmptyTpl>
-            <p class="text-faint" style="font-size:11px">Aucun conteneur INDDID actif.</p>
+            <p class="text-faint" style="font-size:11px">Aucun conteneur Blueprint actif.</p>
           </ng-template>
           <div class="deploy-modal__output" *ngIf="deployOutput">
             <div class="deploy-modal__pane-title">Sortie commande</div>
@@ -507,7 +523,7 @@ pveam download local ubuntu-22.04-standard_22.04-1_amd64.tar.zst</pre>
             {{ tfRunning ? 'En cours…' : 'Plan' }}
           </button>
           <button class="btn-primary" (click)="terraformApply()" [disabled]="tfLoading || tfRunning">Apply</button>
-          <button class="btn-danger"  (click)="terraformDestroy()" [disabled]="tfLoading || tfRunning">Destroy</button>
+          <button class="btn-danger"  (click)="terraformDestroyConfirm()" [disabled]="tfLoading || tfRunning">Destroy</button>
         </div>
       </ng-container>
 

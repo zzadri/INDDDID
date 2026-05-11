@@ -57,7 +57,8 @@ export class ModelerComponent implements OnInit, OnDestroy {
     'network', 'router', 'switch', 'cloud', 'service',
     'workstation', 'user', 'vm', 'container',
   ];
-  readonly deployableTypes = new Set<NodeType>(['server', 'application', 'database', 'workstation', 'vm', 'container']);
+  // Mirrors backend DEPLOYABLE_TYPES: VM_TYPES (incl. firewall) + container + network bridge
+  readonly deployableTypes = new Set<NodeType>(['server', 'application', 'database', 'workstation', 'vm', 'firewall', 'container', 'network']);
   nodeIcons = NODE_ICONS.filter(icon => this.paletteNodeTypes.includes(icon.type));
   loading = true;
   saving  = false;
@@ -934,17 +935,43 @@ export class ModelerComponent implements OnInit, OnDestroy {
   terraformPlan(): void {
     this.tfRunning = true; this.tfError = ''; this.tfOutput = '';
     this.api.terraformPlan(this.projectId).subscribe({
-      next:  (r) => { this.tfRunning = false; this.tfOutput = r.output; if (!r.success) this.tfError = r.error ?? 'Plan échoué'; },
-      error: (err) => { this.tfRunning = false; this.tfError = err?.error?.error ?? 'Echec du terraform plan'; },
+      next:  (r) => { this.tfRunning = false; this.tfOutput = r.output; if (!r.success) this.tfError = this.humanizeTfError(r.error ?? 'Plan échoué'); },
+      error: (err) => { this.tfRunning = false; this.tfError = this.humanizeTfError(err?.error?.error ?? 'Echec du terraform plan'); },
     });
   }
 
   terraformApply(): void {
     this.tfRunning = true; this.tfError = ''; this.tfOutput = '';
     this.api.terraformApply(this.projectId).subscribe({
-      next:  (r) => { this.tfRunning = false; this.tfOutput = r.output; if (!r.success) this.tfError = r.error ?? 'Apply échoué'; },
-      error: (err) => { this.tfRunning = false; this.tfError = err?.error?.error ?? 'Echec du terraform apply'; },
+      next:  (r) => { this.tfRunning = false; this.tfOutput = r.output; if (!r.success) this.tfError = this.humanizeTfError(r.error ?? 'Apply échoué'); },
+      error: (err) => { this.tfRunning = false; this.tfError = this.humanizeTfError(err?.error?.error ?? 'Echec du terraform apply'); },
     });
+  }
+
+  /**
+   * Translates raw Terraform/Proxmox error messages into actionable user messages.
+   * Covers the most common connectivity failures when running terraform plan/apply.
+   */
+  private humanizeTfError(raw: string): string {
+    const s = raw.toLowerCase();
+    if (s.includes('connection refused') || s.includes('econnrefused') || s.includes('no such host') || s.includes('unreachable'))
+      return `Endpoint Proxmox injoignable — vérifiez l'URL et le port dans la config Proxmox (${raw.slice(0, 120)})`;
+    if (s.includes('certificate') || s.includes('x509') || s.includes('tls'))
+      return `Erreur TLS/certificat Proxmox — connexion chiffrée refusée (${raw.slice(0, 120)})`;
+    if (s.includes('401') || s.includes('unauthorized') || s.includes('invalid credentials') || s.includes('permission denied'))
+      return `Credentials Proxmox incorrects — vérifiez le token API ou le mot de passe (${raw.slice(0, 120)})`;
+    if (s.includes('timeout'))
+      return `Timeout Proxmox — opération trop longue ou endpoint lent (${raw.slice(0, 120)})`;
+    if (s.includes('no deployable'))
+      return 'Aucun nœud déployable dans ce projet — ajoutez un serveur, VM, container, firewall ou réseau.';
+    return raw;
+  }
+
+  /** Returns true if the value matches the given regex pattern string. */
+  isPatternValid(pattern: string, value: unknown): boolean {
+    if (value === undefined || value === null || value === '') return true;
+    try { return new RegExp(pattern).test(String(value)); }
+    catch { return true; }
   }
 
   terraformDestroyConfirm(): void {
@@ -957,8 +984,8 @@ export class ModelerComponent implements OnInit, OnDestroy {
   private terraformDestroy(): void {
     this.tfRunning = true; this.tfError = ''; this.tfOutput = '';
     this.api.terraformDestroy(this.projectId).subscribe({
-      next:  (r) => { this.tfRunning = false; this.tfOutput = r.output; if (!r.success) this.tfError = r.error ?? 'Destroy échoué'; },
-      error: (err) => { this.tfRunning = false; this.tfError = err?.error?.error ?? 'Echec du terraform destroy'; },
+      next:  (r) => { this.tfRunning = false; this.tfOutput = r.output; if (!r.success) this.tfError = this.humanizeTfError(r.error ?? 'Destroy échoué'); },
+      error: (err) => { this.tfRunning = false; this.tfError = this.humanizeTfError(err?.error?.error ?? 'Echec du terraform destroy'); },
     });
   }
 

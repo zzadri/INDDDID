@@ -348,6 +348,13 @@
     }
   }
 
+  // ── Element: input invalid state (e.g. bad IP format) ───────────────────
+  // Scoped to .prop-panel context to not bleed globally.
+  .input--invalid {
+    border-color: var(--accent-red, #e74c3c) !important;
+    background-color: color-mix(in srgb, var(--accent-red, #e74c3c) 6%, transparent);
+  }
+
   // ── Element: bool field ──────────────────────────────────────────────────
   &__bool-field {
     display: flex;

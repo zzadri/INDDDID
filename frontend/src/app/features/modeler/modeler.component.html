@@ -80,7 +80,7 @@
            draggable="true"
            (dragstart)="onPaletteDragStart($event, icon.type)"
            (dblclick)="addNode(icon.type)"
-           [title]="icon.label + ' — glisser ou double-clic'">
+           [title]="icon.label + (deployableTypes.has(icon.type) ? ' ⚡ Déployable via Terraform' : ' ◉ Visualisation uniquement') + ' — glisser ou double-clic'">
         <span class="palette__icon" [innerHTML]="safeIcon(icon.type, 18)"></span>
         <span class="palette__label">{{ icon.label }}</span>
         <span class="palette__deploy-badge"
@@ -142,7 +142,7 @@
                 <option value="">— choisir —</option>
                 <option *ngFor="let o of field.options" [value]="o">{{ o }}</option>
               </select>
-              <input *ngSwitchCase="'text'"     type="text"   [(ngModel)]="nodeForm[field.key]" [placeholder]="field.placeholder ?? ''">
+              <input *ngSwitchCase="'text'"     type="text"   [(ngModel)]="nodeForm[field.key]" [placeholder]="field.placeholder ?? ''" [attr.pattern]="field.pattern ?? null" [class.input--invalid]="field.pattern && nodeForm[field.key] && !isPatternValid(field.pattern, nodeForm[field.key])">
               <input *ngSwitchCase="'number'"   type="number" [(ngModel)]="nodeForm[field.key]" [placeholder]="field.placeholder ?? ''">
               <textarea *ngSwitchCase="'textarea'" [(ngModel)]="nodeForm[field.key]" rows="3" [placeholder]="field.placeholder ?? ''"></textarea>
               <label class="prop-panel__bool-field" *ngSwitchCase="'boolean'">

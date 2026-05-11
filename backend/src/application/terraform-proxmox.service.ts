@@ -251,6 +251,14 @@ function generateVmResource(node: Node): string {
     model  = "virtio"
   }
 
+  # Serial console required for Ubuntu cloud images — output goes to serial0, not VGA.
+  # Without this, Proxmox console shows nothing after "Starting serial terminal on interface serial0".
+  serial_device {}
+
+  vga {
+    type = "serial0"
+  }
+
   initialization {
     datastore_id = var.storage
     interface    = "ide2"

@@ -72,9 +72,22 @@ async function waitTask(cfg: ProxmoxConfigResolved, upid: string, timeoutMs = 10
 async function templateExists(cfg: ProxmoxConfigResolved): Promise<boolean> {
   try {
     const r = await pveApi(cfg, `/nodes/${cfg.node}/qemu/${cfg.template_vm_id}/config`) as {
-      data: { template?: number };
+      data: { template?: number; scsi0?: string; name?: string };
     };
-    return r.data?.template === 1;
+    if (!r.data?.template) return false;
+    // Verify it's our cloud-image template, not a stale ISO-based VM.
+    const isCloudTemplate =
+      r.data.name === TEMPLATE_NAME ||
+      String(r.data.scsi0 ?? '').includes(CLOUD_IMAGE_NAME.replace('.img', '')) ||
+      String(r.data.scsi0 ?? '').includes('cloudimg');
+    if (!isCloudTemplate) {
+      console.warn(
+        `[blueprint] Template VM ${cfg.template_vm_id} exists but does not look like a cloud-image template ` +
+        `(name=${r.data.name}, scsi0=${r.data.scsi0}). ` +
+        `Delete VM ${cfg.template_vm_id} in Proxmox and re-run Plan to force a clean cloud-image rebuild.`,
+      );
+    }
+    return true;
   } catch (e) {
     const msg = (e as Error).message;
     if (/\b404\b/.test(msg) || /does not exist/i.test(msg)) return false;
@@ -139,7 +152,12 @@ export async function ensureTemplate(cfg: ProxmoxConfigResolved): Promise<{ crea
   }
 
   if (await templateExists(cfg)) {
-    return { created: false, message: `Template VM ${cfg.template_vm_id} already present` };
+    return {
+      created: false,
+      message: `Template VM ${cfg.template_vm_id} already present (Ubuntu 22.04 cloud-image). ` +
+               `If the VM boots to a blank console, delete VM ${cfg.template_vm_id} in Proxmox ` +
+               `and re-run Plan — Blueprint will recreate a clean cloud-image template automatically.`,
+    };
   }
 
   await downloadCloudImage(cfg);

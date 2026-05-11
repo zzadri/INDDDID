@@ -143,16 +143,19 @@ export class ModelerComponent implements OnInit, OnDestroy {
   proxmoxConfigSaving  = false;
   proxmoxConfigError   = '';
   proxmoxConfigForm: ProxmoxConfigInput & { credential_mode: 'token' | 'password' } = {
-    endpoint: '',
-    username: 'terraform-prov@pve',
-    api_token: '',
-    password: '',
-    node: 'pve',
-    template_vm_id: 9000,
-    storage: 'local-lvm',
-    gateway: '192.168.1.1',
-    lxc_template: 'local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst',
+    endpoint:        '',
+    username:        'terraform-prov@pve',
+    api_token:       '',
+    password:        '',
+    node:            'pve',
+    template_vm_id:  9000,
+    storage:         'local-lvm',
+    gateway:         '192.168.1.1',
+    lxc_template:    'local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst',
     credential_mode: 'token',
+    vm_user:         'ubuntu',
+    vm_password:     '',
+    vm_ssh_key:      '',
   };
 
   // ── Keyboard help modal ────────────────────────────────────────────────────
@@ -954,16 +957,24 @@ export class ModelerComponent implements OnInit, OnDestroy {
    */
   private humanizeTfError(raw: string): string {
     const s = raw.toLowerCase();
-    if (s.includes('connection refused') || s.includes('econnrefused') || s.includes('no such host') || s.includes('unreachable'))
-      return `Endpoint Proxmox injoignable — vérifiez l'URL et le port dans la config Proxmox (${raw.slice(0, 120)})`;
+    // Network unreachable — most common: wrong port (443 instead of 8006)
+    if (s.includes('connection refused') || s.includes('econnrefused') || s.includes('connect: connection refused') || s.includes('no such host') || s.includes('unreachable') || s.includes('injoignable'))
+      return `❌ Proxmox injoignable — endpoint incorrect ou service arrêté.\n` +
+             `→ L'endpoint DOIT inclure le port :8006 — ex: https://192.168.1.92:8006\n` +
+             `→ Ouvrez "Config Proxmox" et corrigez l'URL.\nDétail: ${raw.slice(0, 200)}`;
+    // fetch() network error (no connectivity at all)
+    if (s.includes('fetch failed') || s.includes('failed to fetch') || s.includes('network error'))
+      return `❌ Connexion réseau impossible vers Proxmox.\n` +
+             `→ Vérifiez l'endpoint (format: https://IP:8006)\n` +
+             `→ Vérifiez que Proxmox est démarré et accessible depuis le container Blueprint.\nDétail: ${raw.slice(0, 200)}`;
     if (s.includes('certificate') || s.includes('x509') || s.includes('tls'))
-      return `Erreur TLS/certificat Proxmox — connexion chiffrée refusée (${raw.slice(0, 120)})`;
+      return `❌ Erreur TLS/certificat — connexion chiffrée refusée.\nDétail: ${raw.slice(0, 200)}`;
     if (s.includes('401') || s.includes('unauthorized') || s.includes('invalid credentials') || s.includes('permission denied'))
-      return `Credentials Proxmox incorrects — vérifiez le token API ou le mot de passe (${raw.slice(0, 120)})`;
-    if (s.includes('timeout'))
-      return `Timeout Proxmox — opération trop longue ou endpoint lent (${raw.slice(0, 120)})`;
+      return `❌ Credentials Proxmox incorrects — vérifiez le token API ou le mot de passe.\nDétail: ${raw.slice(0, 200)}`;
+    if (s.includes('timeout') || s.includes('context deadline exceeded'))
+      return `❌ Timeout Proxmox — opération trop longue ou endpoint lent.\nDétail: ${raw.slice(0, 200)}`;
     if (s.includes('no deployable'))
-      return 'Aucun nœud déployable dans ce projet — ajoutez un serveur, VM, container, firewall ou réseau.';
+      return '❌ Aucun nœud déployable — ajoutez un serveur, VM, container, firewall ou réseau.';
     return raw;
   }
 
@@ -1011,6 +1022,9 @@ export class ModelerComponent implements OnInit, OnDestroy {
             gateway:         resp.config.gateway,
             lxc_template:    resp.config.lxc_template,
             credential_mode: resp.config.has_api_token ? 'token' : 'password',
+            vm_user:         resp.config.vm_user ?? 'ubuntu',
+            vm_password:     '',
+            vm_ssh_key:      resp.config.vm_ssh_key ?? '',
           };
         } else {
           this.proxmoxConfigForm = {
@@ -1024,6 +1038,9 @@ export class ModelerComponent implements OnInit, OnDestroy {
             gateway:         '192.168.1.1',
             lxc_template:    'local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst',
             credential_mode: 'token',
+            vm_user:         'ubuntu',
+            vm_password:     '',
+            vm_ssh_key:      '',
           };
         }
       },
@@ -1046,6 +1063,10 @@ export class ModelerComponent implements OnInit, OnDestroy {
       storage:        f.storage?.trim() || 'local-lvm',
       gateway:        f.gateway?.trim() || '192.168.1.1',
       lxc_template:   f.lxc_template?.trim() || 'local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst',
+      vm_user:        f.vm_user?.trim() || 'ubuntu',
+      // Empty string → undefined → service preserves existing encrypted value
+      vm_password:    f.vm_password?.trim() ? f.vm_password.trim() : undefined,
+      vm_ssh_key:     f.vm_ssh_key?.trim() || null,
     };
     // Only send the credential the user selected — leaves the other cleared.
     if (f.credential_mode === 'token') {

@@ -1085,6 +1085,17 @@ kbd {
   gap: 10px;
 }
 
+.proxmox-cfg-modal__section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+}
+
 .proxmox-cfg-modal__radio-row {
   display: flex;
   gap: 16px;

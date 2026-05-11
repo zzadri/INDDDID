@@ -127,17 +127,20 @@ export interface TerraformResult {
 // ── Proxmox config per project ───────────────────────────────────────────────
 
 export interface ProxmoxConfigPublic {
-  project_id:     string;
-  endpoint:       string;
-  username:       string;
-  node:           string;
-  template_vm_id: number;
-  storage:        string;
-  gateway:        string;
-  lxc_template:   string;
-  has_api_token:  boolean;
-  has_password:   boolean;
-  updated_at:     string;
+  project_id:      string;
+  endpoint:        string;
+  username:        string;
+  node:            string;
+  template_vm_id:  number;
+  storage:         string;
+  gateway:         string;
+  lxc_template:    string;
+  has_api_token:   boolean;
+  has_password:    boolean;
+  vm_user:         string;
+  has_vm_password: boolean;
+  vm_ssh_key:      string | null;
+  updated_at:      string;
 }
 
 export interface ProxmoxConfigResponse {
@@ -145,13 +148,16 @@ export interface ProxmoxConfigResponse {
 }
 
 export interface ProxmoxConfigInput {
-  endpoint:       string;
-  username:       string;
-  api_token?:     string | null;
-  password?:      string | null;
-  node?:          string;
+  endpoint:        string;
+  username:        string;
+  api_token?:      string | null;
+  password?:       string | null;
+  node?:           string;
   template_vm_id?: number;
   storage?:        string;
   gateway?:        string;
   lxc_template?:   string;
+  vm_user?:        string;
+  vm_password?:    string | null;
+  vm_ssh_key?:     string | null;
 }

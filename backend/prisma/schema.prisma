@@ -71,6 +71,10 @@ model ProjectProxmoxConfig {
   storage         String   @default("local-lvm")   @db.VarChar(100)
   gateway         String   @default("192.168.1.1") @db.VarChar(100)
   lxc_template    String   @default("local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst") @db.VarChar(300)
+  // VM cloud-init credentials (Terraform user_account block)
+  vm_user         String   @default("ubuntu")      @db.VarChar(100)
+  vm_password_enc String?                           // AES-256-GCM encrypted — default password for VMs
+  vm_ssh_key      String?  @db.Text                // SSH public key (not secret, stored plain)
   created_at      DateTime @default(now()) @db.Timestamp(6)
   updated_at      DateTime @updatedAt      @db.Timestamp(6)
   project         Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)

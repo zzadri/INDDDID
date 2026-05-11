@@ -26,8 +26,23 @@ interface ApiOpts {
   expect?:  'json' | 'text';
 }
 
+/** Validates and normalises the endpoint URL — appends :8006 if no port is set. */
+function normaliseEndpoint(raw: string): string {
+  const trimmed = raw.replace(/\/+$/, '');
+  try {
+    const u = new URL(trimmed);
+    // Default HTTPS port is 443; Proxmox runs on 8006 — auto-correct silent misconfiguration.
+    if (!u.port || u.port === '443') {
+      u.port = '8006';
+      return u.origin; // "https://IP:8006"
+    }
+  } catch { /* invalid URL — pass as-is so the real error surfaces */ }
+  return trimmed;
+}
+
 async function pveApi(cfg: ProxmoxConfigResolved, path: string, opts: ApiOpts = {}): Promise<unknown> {
-  const url = `${cfg.endpoint.replace(/\/+$/, '')}/api2/json${path}`;
+  const base = normaliseEndpoint(cfg.endpoint);
+  const url  = `${base}/api2/json${path}`;
   const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
 
   if (cfg.api_token) {
@@ -44,7 +59,19 @@ async function pveApi(cfg: ProxmoxConfigResolved, path: string, opts: ApiOpts = 
     ? new URLSearchParams(Object.entries(opts.body).map(([k, v]) => [k, String(v)] as [string, string])).toString()
     : undefined;
 
-  const res = await fetch(url, { method: opts.method ?? 'GET', headers, body });
+  let res: Response;
+  try {
+    res = await fetch(url, { method: opts.method ?? 'GET', headers, body });
+  } catch (e) {
+    // fetch() throws a generic TypeError("fetch failed") on network errors — enrich it.
+    const cause = (e as { cause?: { message?: string } }).cause?.message ?? (e as Error).message;
+    throw new Error(
+      `[Blueprint] Proxmox injoignable à ${url}\n` +
+      `Cause : ${cause}\n` +
+      `→ Vérifiez que l'endpoint inclut le port (:8006) — ex: https://192.168.1.92:8006\n` +
+      `→ Vérifiez que le service Proxmox est démarré et accessible depuis le container Blueprint.`,
+    );
+  }
 
   if (opts.expect === 'text') return await res.text();
   const text = await res.text();

@@ -21,6 +21,10 @@ export interface ProxmoxConfigInput {
   storage?:        string;
   gateway?:        string;
   lxc_template?:   string;
+  // VM cloud-init credentials
+  vm_user?:        string;
+  vm_password?:    string | null;
+  vm_ssh_key?:     string | null;
 }
 
 /** Safe DTO for the frontend — secrets are never returned in clear. */
@@ -35,6 +39,9 @@ export interface ProxmoxConfigPublic {
   lxc_template:      string;
   has_api_token:     boolean;
   has_password:      boolean;
+  vm_user:           string;
+  has_vm_password:   boolean;
+  vm_ssh_key:        string | null;  // public key — not secret
   updated_at:        Date;
 }
 
@@ -49,6 +56,9 @@ export interface ProxmoxConfigResolved {
   storage:           string;
   gateway:           string;
   lxc_template:      string;
+  vm_user:           string;
+  vm_password:       string | null;
+  vm_ssh_key:        string | null;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -60,30 +70,36 @@ function normalizeUsername(u: string): string {
 }
 
 function toPublic(row: {
-  project_id:     string;
-  endpoint:       string;
-  username:       string;
-  api_token_enc:  string | null;
-  password_enc:   string | null;
-  node:           string;
-  template_vm_id: number;
-  storage:        string;
-  gateway:        string;
-  lxc_template:   string;
-  updated_at:     Date;
+  project_id:      string;
+  endpoint:        string;
+  username:        string;
+  api_token_enc:   string | null;
+  password_enc:    string | null;
+  node:            string;
+  template_vm_id:  number;
+  storage:         string;
+  gateway:         string;
+  lxc_template:    string;
+  vm_user:         string;
+  vm_password_enc: string | null;
+  vm_ssh_key:      string | null;
+  updated_at:      Date;
 }): ProxmoxConfigPublic {
   return {
-    project_id:     row.project_id,
-    endpoint:       row.endpoint,
-    username:       row.username,
-    node:           row.node,
-    template_vm_id: row.template_vm_id,
-    storage:        row.storage,
-    gateway:        row.gateway,
-    lxc_template:   row.lxc_template,
-    has_api_token:  !!row.api_token_enc,
-    has_password:   !!row.password_enc,
-    updated_at:     row.updated_at,
+    project_id:      row.project_id,
+    endpoint:        row.endpoint,
+    username:        row.username,
+    node:            row.node,
+    template_vm_id:  row.template_vm_id,
+    storage:         row.storage,
+    gateway:         row.gateway,
+    lxc_template:    row.lxc_template,
+    has_api_token:   !!row.api_token_enc,
+    has_password:    !!row.password_enc,
+    vm_user:         row.vm_user,
+    has_vm_password: !!row.vm_password_enc,
+    vm_ssh_key:      row.vm_ssh_key,
+    updated_at:      row.updated_at,
   };
 }
 
@@ -109,6 +125,9 @@ export async function getResolvedConfig(projectId: string): Promise<ProxmoxConfi
     storage:        row.storage,
     gateway:        row.gateway,
     lxc_template:   row.lxc_template,
+    vm_user:        row.vm_user,
+    vm_password:    decrypt(row.vm_password_enc),
+    vm_ssh_key:     row.vm_ssh_key,
   };
 }
 
@@ -137,6 +156,10 @@ export async function upsertConfig(
     throw new ValidationError('A Proxmox API token or password is required');
   }
 
+  const vmPasswordEnc = input.vm_password !== undefined
+    ? (input.vm_password ? encrypt(input.vm_password) : null)
+    : existing?.vm_password_enc ?? null;
+
   const data = {
     endpoint,
     username,
@@ -147,6 +170,11 @@ export async function upsertConfig(
     storage:        input.storage?.trim()       || 'local-lvm',
     gateway:        input.gateway?.trim()       || '192.168.1.1',
     lxc_template:   input.lxc_template?.trim()  || 'local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst',
+    vm_user:        input.vm_user?.trim()       || 'ubuntu',
+    vm_password_enc: vmPasswordEnc,
+    vm_ssh_key:     input.vm_ssh_key !== undefined
+                      ? (input.vm_ssh_key?.trim() || null)
+                      : existing?.vm_ssh_key ?? null,
   };
 
   const row = await prisma.projectProxmoxConfig.upsert({

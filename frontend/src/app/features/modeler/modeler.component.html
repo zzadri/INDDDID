@@ -497,7 +497,29 @@ pveam download local ubuntu-22.04-standard_22.04-1_amd64.tar.zst</pre>
         </div>
 
         <div class="deploy-modal__body" *ngIf="!tfLoading; else tfLoadingTpl">
-          <div class="deploy-modal__pane">
+
+          <!-- Spinner overlay while terraform runs -->
+          <div class="tf-running-overlay" *ngIf="tfRunning">
+            <div class="tf-running-overlay__card">
+              <div class="spinner tf-running-overlay__spinner"></div>
+              <div class="tf-running-overlay__action">
+                Terraform
+                <strong *ngIf="tfRunningAction === 'plan'">Plan</strong>
+                <strong *ngIf="tfRunningAction === 'apply'">Apply</strong>
+                <strong *ngIf="tfRunningAction === 'destroy'">Destroy</strong>
+                en cours…
+              </div>
+              <div class="tf-running-overlay__elapsed">{{ tfElapsedLabel }}</div>
+              <div class="tf-running-overlay__hint" *ngIf="tfRunningAction === 'apply'">
+                La création de VMs peut prendre 3–10 min
+              </div>
+              <div class="tf-running-overlay__hint" *ngIf="tfRunningAction === 'destroy'">
+                Destruction en cours, patientez…
+              </div>
+            </div>
+          </div>
+
+          <div class="deploy-modal__pane" [class.deploy-modal__pane--dimmed]="tfRunning">
             <div class="deploy-modal__pane-title">
               HCL généré — {{ tfDeployableCount }} ressource(s) Proxmox
               <span *ngIf="tfSkippedTypes.length" class="text-faint" style="font-weight:400; margin-left:6px">
@@ -519,9 +541,7 @@ pveam download local ubuntu-22.04-standard_22.04-1_amd64.tar.zst</pre>
           <button (click)="loadTerraformPreview()" [disabled]="tfLoading || tfRunning">
             {{ tfLoading ? 'Génération…' : 'Régénérer HCL' }}
           </button>
-          <button (click)="terraformPlan()" [disabled]="tfLoading || tfRunning">
-            {{ tfRunning ? 'En cours…' : 'Plan' }}
-          </button>
+          <button (click)="terraformPlan()" [disabled]="tfLoading || tfRunning">Plan</button>
           <button class="btn-primary" (click)="terraformApply()" [disabled]="tfLoading || tfRunning">Apply</button>
           <button class="btn-danger"  (click)="terraformDestroyConfirm()" [disabled]="tfLoading || tfRunning">Destroy</button>
         </div>

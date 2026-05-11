@@ -28,9 +28,12 @@ const TF_WORKDIR = path.join(process.env.DEPLOYMENTS_DIR ?? '/tmp/blueprint-depl
 const TF_EXEC_OPTS = { maxBuffer: 64 * 1024 * 1024, timeout: 30 * 60 * 1000 } as const;
 
 // ── Node types that map to Proxmox resources ─────────────────────────────────
-const VM_TYPES         = new Set(['server', 'application', 'database', 'workstation', 'vm']);
+// firewall → VM (pfSense / OPNsense / Sophos run as VMs in Proxmox)
+const VM_TYPES         = new Set(['server', 'application', 'database', 'workstation', 'vm', 'firewall']);
 const CONTAINER_TYPES  = new Set(['container']);
-const DEPLOYABLE_TYPES = new Set([...VM_TYPES, ...CONTAINER_TYPES]);
+// network → proxmox_virtual_environment_network_linux_bridge (VLAN / SDN bridge)
+const NETWORK_TYPES    = new Set(['network']);
+const DEPLOYABLE_TYPES = new Set([...VM_TYPES, ...CONTAINER_TYPES, ...NETWORK_TYPES]);
 
 export interface TerraformPreview {
   hcl:              string;
@@ -63,6 +66,14 @@ function slugifyDnsName(label: string, fallbackId: string): string {
     s = `vm-${fallbackId.replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 8) || 'node'}`;
   }
   return s;
+}
+
+function parseDiskGB(val: unknown): number {
+  if (val === undefined || val === null || val === '') return 20;
+  if (typeof val === 'number') return Math.max(8, Math.round(val));
+  const s = String(val).trim();
+  const m = s.match(/^(\d+)/);
+  return m ? Math.max(8, parseInt(m[1], 10)) : 20;
 }
 
 function parseCpuCores(val: unknown): number {
@@ -166,11 +177,17 @@ variable "ssh_public_key" {
 }
 
 function generateVmResource(node: Node): string {
-  const props  = node.properties as Record<string, unknown>;
-  const name   = sanitizeResourceName(node.id);
-  const cores  = parseCpuCores(props.cpu ?? props.cores ?? 2);
-  const ramMB  = Math.max(64, parseRamMB(props.ram ?? props.memory ?? 2048));
-  const ip     = typeof props.ip === 'string' ? props.ip : null;
+  const props   = node.properties as Record<string, unknown>;
+  const name    = sanitizeResourceName(node.id);
+  const cores   = parseCpuCores(props.cpu ?? props.cores ?? 2);
+  const ramMB   = Math.max(64, parseRamMB(props.ram ?? props.memory ?? 2048));
+  const diskGB  = parseDiskGB(props.disk ?? props.storage ?? 20);
+  const ip      = typeof props.ip === 'string' ? props.ip : null;
+  // Per-node template override (optional — e.g. a specific VM ID for Debian vs Ubuntu)
+  const templateId = props.template_vm_id
+    ? Number(props.template_vm_id)
+    : null;
+
   const ipConfig = ip
     ? `      ipv4 {
         address = "${ip}/24"
@@ -178,7 +195,8 @@ function generateVmResource(node: Node): string {
       }`
     : `      ipv4 { address = "dhcp" }`;
 
-  const dnsName = slugifyDnsName(node.label, node.id);
+  const dnsName   = slugifyDnsName(node.label, node.id);
+  const cloneVmId = templateId ? String(templateId) : 'var.template_vm_id';
 
   return `resource "proxmox_virtual_environment_vm" "${name}" {
   name        = "${dnsName}"
@@ -203,7 +221,7 @@ function generateVmResource(node: Node): string {
   timeout_shutdown_vm  = 120
 
   clone {
-    vm_id = var.template_vm_id
+    vm_id = ${cloneVmId}
     full  = true
   }
 
@@ -223,7 +241,7 @@ function generateVmResource(node: Node): string {
   disk {
     datastore_id = var.storage
     interface    = "scsi0"
-    size         = 20
+    size         = ${diskGB}
     iothread     = true
     discard      = "on"
   }
@@ -311,6 +329,33 @@ ${ipConfig}
 }`;
 }
 
+/**
+ * Generates a Proxmox Linux bridge resource for `network` nodes.
+ * Bridge name must match vmbr\d+ (Proxmox naming constraint), max 10 chars.
+ * VLAN is optional — set from node properties.
+ */
+function generateNetworkBridgeResource(node: Node): string {
+  const props = node.properties as Record<string, unknown>;
+  const name  = sanitizeResourceName(node.id);
+
+  // Derive a deterministic bridge name from node ID: vmbr + last 4 hex chars of UUID
+  const hexSuffix = node.id.replace(/-/g, '').slice(-4);
+  const bridgeName = `vmbr${hexSuffix}`.slice(0, 10);
+
+  const vlanId    = props.vlan   ? Number(props.vlan)  : null;
+  const cidr      = typeof props.cidr    === 'string' ? props.cidr    : null;
+  const comment   = `Blueprint – network – ${node.label.replace(/"/g, '\\"')}`;
+
+  const vlanLine  = vlanId ? `\n  vlan_id   = ${vlanId}` : '';
+  const cidrLine  = cidr   ? `\n  address   = "${cidr}"` : '';
+
+  return `resource "proxmox_virtual_environment_network_linux_bridge" "${name}" {
+  node_name = var.proxmox_node
+  name      = "${bridgeName}"${vlanLine}${cidrLine}
+  comment   = "${comment}"
+}`;
+}
+
 function generateHCL(
   projectId:   string,
   projectName: string,
@@ -318,9 +363,11 @@ function generateHCL(
   cfg:         ProxmoxConfigResolved,
 ): string {
   const deployable = nodes.filter(n => DEPLOYABLE_TYPES.has(n.type));
-  const resources  = deployable.map(n =>
-    CONTAINER_TYPES.has(n.type) ? generateLxcResource(n, cfg) : generateVmResource(n),
-  ).join('\n\n');
+  const resources  = deployable.map(n => {
+    if (CONTAINER_TYPES.has(n.type))  return generateLxcResource(n, cfg);
+    if (NETWORK_TYPES.has(n.type))    return generateNetworkBridgeResource(n);
+    return generateVmResource(n);
+  }).join('\n\n');
 
   return `# ============================================================
 # Blueprint — Proxmox Terraform deployment

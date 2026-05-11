@@ -2,9 +2,11 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
 import { helmetMiddleware, globalRateLimiter } from './presentation/middleware/security';
 import { errorHandler } from './presentation/middleware/error-handler';
 import { env } from './config/env';
+import { swaggerSpec } from './config/swagger';
 
 import authRouter      from './presentation/routes/auth.routes';
 import projectsRouter  from './presentation/routes/project.routes';
@@ -31,6 +33,19 @@ app.use(cookieParser());
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', version: '2.0.0', timestamp: new Date().toISOString() });
 });
+
+// ── Swagger UI — CSP override required for inline scripts/styles ─────────────
+const swaggerCsp = (_req: Request, res: Response, next: () => void) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:;"
+  );
+  next();
+};
+app.use('/api/docs', swaggerCsp, swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: 'Blueprint API Docs',
+}));
+app.get('/api/docs/openapi.json', (_req: Request, res: Response) => res.json(swaggerSpec));
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth',                          authRouter);

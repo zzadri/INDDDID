@@ -403,8 +403,19 @@ async function getWorkdir(projectId: string): Promise<string> {
   return dir;
 }
 
+/** Ensures the Proxmox endpoint includes the :8006 port (Terraform fails silently at port 443). */
+function normaliseProxmoxEndpoint(raw: string): string {
+  const trimmed = raw.replace(/\/+$/, '');
+  try {
+    const u = new URL(trimmed);
+    if (!u.port || u.port === '443') { u.port = '8006'; return u.origin; }
+  } catch { /* invalid URL — pass as-is */ }
+  return trimmed;
+}
+
 async function writeTfvars(workdir: string, cfg: ProxmoxConfigResolved): Promise<void> {
-  const lines: string[] = [`proxmox_endpoint = "${cfg.endpoint}"`];
+  const endpoint = normaliseProxmoxEndpoint(cfg.endpoint);
+  const lines: string[] = [`proxmox_endpoint = "${endpoint}"`];
   if (cfg.api_token) {
     lines.push(`proxmox_api_token = "${cfg.api_token}"`);
   } else {

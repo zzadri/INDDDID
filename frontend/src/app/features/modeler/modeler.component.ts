@@ -1001,6 +1001,15 @@ export class ModelerComponent implements OnInit, OnDestroy {
       return `❌ Timeout Proxmox — opération trop longue ou endpoint lent.\nDétail: ${raw.slice(0, 200)}`;
     if (s.includes('no deployable'))
       return '❌ Aucun nœud déployable — ajoutez un serveur, VM, container, firewall ou réseau.';
+    // Template VM missing — most common after a Proxmox wipe or manual deletion
+    if (s.includes('unable to find configuration file') || s.includes('unable to find vm') ||
+        (s.includes('error cloning') && s.includes('vm')))
+      return `❌ Template VM introuvable dans Proxmox.\n` +
+             `→ Blueprint va le recréer automatiquement avant le prochain Apply.\n` +
+             `→ Si l'erreur persiste : lancez d'abord "Plan" (qui déclenche la création du template)\n` +
+             `  puis relancez "Apply".\nDétail: ${raw.slice(0, 300)}`;
+    if (s.includes('login failed') || s.includes('proxmox login'))
+      return `❌ Authentification Proxmox échouée — vérifiez l'identifiant et le mot de passe dans Config Proxmox.\nDétail: ${raw.slice(0, 200)}`;
     return raw;
   }
 

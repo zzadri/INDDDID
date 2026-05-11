@@ -40,19 +40,50 @@ function normaliseEndpoint(raw: string): string {
   return trimmed;
 }
 
-async function pveApi(cfg: ProxmoxConfigResolved, path: string, opts: ApiOpts = {}): Promise<unknown> {
-  const base = normaliseEndpoint(cfg.endpoint);
-  const url  = `${base}/api2/json${path}`;
+/** Ticket-based auth: POST /access/ticket → PVEAuthCookie + CSRFPreventionToken. */
+async function getTicket(base: string, username: string, password: string): Promise<{ cookie: string; csrf: string }> {
+  const url  = `${base}/api2/json/access/ticket`;
+  const body = new URLSearchParams({ username, password }).toString();
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+  } catch (e) {
+    const cause = (e as { cause?: { message?: string } }).cause?.message ?? (e as Error).message;
+    throw new Error(`[Blueprint] Proxmox injoignable à ${url}\nCause : ${cause}`);
+  }
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Proxmox login failed → ${res.status}: ${text}`);
+  const data = (JSON.parse(text) as { data: { ticket: string; CSRFPreventionToken: string } }).data;
+  return { cookie: `PVEAuthCookie=${data.ticket}`, csrf: data.CSRFPreventionToken };
+}
+
+/** Session credentials resolved once per ensureTemplate call. */
+interface Session {
+  authHeader?:  string; // api token
+  cookie?:      string; // ticket auth
+  csrf?:        string; // CSRF token for POST/DELETE
+}
+
+async function pveApiWithSession(
+  session: Session,
+  base:    string,
+  apiPath: string,
+  opts:    ApiOpts = {},
+): Promise<unknown> {
+  const url     = `${base}/api2/json${apiPath}`;
   const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
 
-  if (cfg.api_token) {
-    headers.Authorization = `PVEAPIToken=${cfg.api_token}`;
-  } else if (cfg.password) {
-    // Ticket-based auth would require a separate login round-trip; the POC relies
-    // on api_token auth for preflight. Password flow falls through to terraform only.
-    throw new Error('Template preflight requires a Proxmox API token (password auth not supported)');
-  } else {
-    throw new Error('Proxmox config has no credential');
+  if (session.authHeader) {
+    headers.Authorization = session.authHeader;
+  } else if (session.cookie) {
+    headers.Cookie = session.cookie;
+    if (opts.method && opts.method !== 'GET') {
+      headers.CSRFPreventionToken = session.csrf ?? '';
+    }
   }
 
   const body = opts.body
@@ -63,7 +94,6 @@ async function pveApi(cfg: ProxmoxConfigResolved, path: string, opts: ApiOpts = 
   try {
     res = await fetch(url, { method: opts.method ?? 'GET', headers, body });
   } catch (e) {
-    // fetch() throws a generic TypeError("fetch failed") on network errors — enrich it.
     const cause = (e as { cause?: { message?: string } }).cause?.message ?? (e as Error).message;
     throw new Error(
       `[Blueprint] Proxmox injoignable à ${url}\n` +
@@ -75,8 +105,27 @@ async function pveApi(cfg: ProxmoxConfigResolved, path: string, opts: ApiOpts = 
 
   if (opts.expect === 'text') return await res.text();
   const text = await res.text();
-  if (!res.ok) throw new Error(`Proxmox API ${path} → ${res.status}: ${text}`);
+  if (!res.ok) throw new Error(`Proxmox API ${apiPath} → ${res.status}: ${text}`);
   try { return JSON.parse(text); } catch { return text; }
+}
+
+/** Build a session from cfg (api_token or password/ticket). */
+async function buildSession(cfg: ProxmoxConfigResolved): Promise<{ session: Session; base: string }> {
+  const base = normaliseEndpoint(cfg.endpoint);
+  if (cfg.api_token) {
+    return { base, session: { authHeader: `PVEAPIToken=${cfg.api_token}` } };
+  }
+  if (cfg.password) {
+    const { cookie, csrf } = await getTicket(base, cfg.username, cfg.password);
+    return { base, session: { cookie, csrf } };
+  }
+  throw new Error('Proxmox config has no credential');
+}
+
+// Legacy wrapper used by functions that pass cfg directly (pre-session refactor).
+async function pveApi(cfg: ProxmoxConfigResolved, path: string, opts: ApiOpts = {}): Promise<unknown> {
+  const { session, base } = await buildSession(cfg);
+  return pveApiWithSession(session, base, path, opts);
 }
 
 async function waitTask(cfg: ProxmoxConfigResolved, upid: string, timeoutMs = 10 * 60 * 1000): Promise<void> {
@@ -172,10 +221,8 @@ async function convertToTemplate(cfg: ProxmoxConfigResolved): Promise<void> {
 // ── Public API ──────────────────────────────────────────────────────────────
 
 export async function ensureTemplate(cfg: ProxmoxConfigResolved): Promise<{ created: boolean; message: string }> {
-  if (!cfg.api_token) {
-    // Password auth not implemented for preflight; let terraform fail with its
-    // own error message so the user can diagnose.
-    return { created: false, message: 'Template preflight skipped (password auth, token required)' };
+  if (!cfg.api_token && !cfg.password) {
+    return { created: false, message: 'Template preflight skipped (no credential configured)' };
   }
 
   if (await templateExists(cfg)) {
